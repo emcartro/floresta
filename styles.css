@@ -800,6 +800,71 @@ body {
   gap: 16px;
 }
 
+/* Distribución en 2 columnas: Columna 1 (Categoría + Tipo) y Columna 2 (Habitaciones) */
+.filters-two-columns-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 768px) {
+  .filters-two-columns-layout {
+    grid-template-columns: 280px 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+}
+
+.filters-col-attributes {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .filters-col-attributes {
+    border-right: 1px solid var(--border);
+    padding-right: 24px;
+  }
+}
+
+.filters-col-rooms {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.filters-col-attributes .category-filter-wrapper {
+  width: 100%;
+}
+
+.filters-col-attributes .category-select-box {
+  width: 100%;
+}
+
+.tag-filter-group-vertical {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (min-width: 768px) {
+  .tag-filter-group-vertical {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .tag-filter-group-vertical .tag-pill {
+    width: 100%;
+    justify-content: space-between;
+    box-sizing: border-box;
+    padding: 7px 12px;
+  }
+}
+
 .filter-group-block {
   display: flex;
   flex-direction: column;

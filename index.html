@@ -294,59 +294,66 @@
           </div>
 
           <div class="filters-expanded-content">
-            <!-- 1. Tipo de Destino (Vender, Almacenar, Llevar, Donar, Todas) -->
-            <div class="filter-group-block">
-              <span class="filter-group-title">Tipo de Destino:</span>
-              <div class="tag-filter-group" role="group" aria-label="Filtrar por etiqueta de destino">
-                <button class="tag-pill active" data-tag="ALL">
-                  <span>Todas</span>
-                  <span class="pill-count" id="pill-count-all">0</span>
-                </button>
-                <button class="tag-pill tag-guardar-pill" data-tag="Almacenar">
-                  <span class="dot dot-guardar"></span>
-                  <span>Almacenar</span>
-                  <span class="pill-count" id="pill-count-guardar">0</span>
-                </button>
-                <button class="tag-pill tag-llevar-pill" data-tag="Llevar">
-                  <span class="dot dot-llevar"></span>
-                  <span>Llevar</span>
-                  <span class="pill-count" id="pill-count-llevar">0</span>
-                </button>
-                <button class="tag-pill tag-donar-pill" data-tag="Donar">
-                  <span class="dot dot-donar"></span>
-                  <span>Donar</span>
-                  <span class="pill-count" id="pill-count-donar">0</span>
-                </button>
-                <button class="tag-pill tag-vender-pill" data-tag="Vender">
-                  <span class="dot dot-vender"></span>
-                  <span>Vender</span>
-                  <span class="pill-count" id="pill-count-vender">0</span>
-                </button>
-              </div>
-            </div>
+            <div class="filters-two-columns-layout">
+              <!-- Columna 1: Filtros de Atributos (Categoría y Tipo de Destino en la misma columna) -->
+              <div class="filters-col-attributes">
+                <!-- Filtro por Categoría -->
+                <div class="filter-group-block">
+                  <span class="filter-group-title">Categoría:</span>
+                  <div class="category-filter-wrapper">
+                    <label for="filter-categoria" class="sr-only">Filtrar por Categoría</label>
+                    <div class="category-select-box">
+                      <span class="category-select-icon">🏷️</span>
+                      <select id="filter-categoria" class="category-filter-select" aria-label="Filtrar por categoría">
+                        <option value="ALL">Todas las Categorías</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
 
-            <!-- 2. Filtro por Categoría -->
-            <div class="filter-group-block">
-              <span class="filter-group-title">Categoría:</span>
-              <div class="category-filter-wrapper">
-                <label for="filter-categoria" class="sr-only">Filtrar por Categoría</label>
-                <div class="category-select-box">
-                  <span class="category-select-icon">🏷️</span>
-                  <select id="filter-categoria" class="category-filter-select" aria-label="Filtrar por categoría">
-                    <option value="ALL">Todas las Categorías</option>
-                  </select>
+                <!-- Tipo de Destino -->
+                <div class="filter-group-block">
+                  <span class="filter-group-title">Tipo de Destino:</span>
+                  <div class="tag-filter-group tag-filter-group-vertical" role="group" aria-label="Filtrar por etiqueta de destino">
+                    <button class="tag-pill active" data-tag="ALL">
+                      <span>Todas</span>
+                      <span class="pill-count" id="pill-count-all">0</span>
+                    </button>
+                    <button class="tag-pill tag-guardar-pill" data-tag="Almacenar">
+                      <span class="dot dot-guardar"></span>
+                      <span>Almacenar</span>
+                      <span class="pill-count" id="pill-count-guardar">0</span>
+                    </button>
+                    <button class="tag-pill tag-llevar-pill" data-tag="Llevar">
+                      <span class="dot dot-llevar"></span>
+                      <span>Llevar</span>
+                      <span class="pill-count" id="pill-count-llevar">0</span>
+                    </button>
+                    <button class="tag-pill tag-donar-pill" data-tag="Donar">
+                      <span class="dot dot-donar"></span>
+                      <span>Donar</span>
+                      <span class="pill-count" id="pill-count-donar">0</span>
+                    </button>
+                    <button class="tag-pill tag-vender-pill" data-tag="Vender">
+                      <span class="dot dot-vender"></span>
+                      <span>Vender</span>
+                      <span class="pill-count" id="pill-count-vender">0</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- 3. Distribución por Habitaciones / Secciones (Solo con productos) -->
-            <div class="filter-group-block">
-              <div class="filter-rooms-title-row">
-                <span class="filter-group-title">Distribución por Habitación:</span>
-                <span class="filter-group-hint">(Solo habitaciones con productos registrados)</span>
-              </div>
-              <div class="breakdown-grid" id="breakdown-grid">
-                <!-- Inyectado dinámicamente: solo habitaciones con productos -->
+              <!-- Columna 2: Distribución por Habitaciones (Solo con productos) -->
+              <div class="filters-col-rooms">
+                <div class="filter-group-block">
+                  <div class="filter-rooms-title-row">
+                    <span class="filter-group-title">Distribución por Habitación:</span>
+                    <span class="filter-group-hint">(Solo con productos)</span>
+                  </div>
+                  <div class="breakdown-grid" id="breakdown-grid">
+                    <!-- Inyectado dinámicamente: solo habitaciones con productos -->
+                  </div>
+                </div>
               </div>
             </div>
           </div>
