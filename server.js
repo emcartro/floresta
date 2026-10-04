@@ -10,6 +10,9 @@ const multer = require('multer');
 const archiver = require('archiver');
 const AdmZip = require('adm-zip');
 const { 
+  UserRepo,
+  SessionRepo,
+  CasaRepo,
   SectionRepo, 
   CategoryRepo,
   ItemRepo, 
@@ -50,11 +53,60 @@ const upload = multer({
   }
 });
 
+// Helper para parsear cookies simples sin librerías externas
+function parseCookies(req) {
+  const list = {};
+  const rc = req.headers.cookie;
+  if (rc) {
+    rc.split(';').forEach(cookie => {
+      const parts = cookie.split('=');
+      const key = parts.shift().trim();
+      const value = decodeURI(parts.join('='));
+      if (key) list[key] = value;
+    });
+  }
+  return list;
+}
+
 // Middlewares
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-// Servir fotos subidas
+// Middleware de Autenticación
+function requireAuth(req, res, next) {
+  // 1. Extraer token de cabecera Authorization: Bearer <token>
+  const authHeader = req.headers.authorization;
+  let token = null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7).trim();
+  }
+
+  // 2. Fallback a Cookie de sesión
+  if (!token) {
+    const cookies = parseCookies(req);
+    token = cookies['session_token'];
+  }
+
+  // 3. Fallback a query param (?token=) para descargas directas de CSV / backup
+  if (!token && req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
+    return res.status(401).json({ error: 'No autenticado. Inicie sesión para continuar.' });
+  }
+
+  const session = SessionRepo.getByToken(token);
+  if (!session) {
+    return res.status(401).json({ error: 'Sesión expirada o inválida. Inicie sesión nuevamente.' });
+  }
+
+  req.user = session;
+  req.token = token;
+  next();
+}
+
+// Servir fotos subidas (permitir visualización)
 app.use('/uploads', express.static(UPLOADS_DIR, {
   maxAge: '7d',
   immutable: true
@@ -74,13 +126,245 @@ app.use(express.static(path.join(__dirname), {
 }));
 
 // =============================================================================
+// API REST - AUTENTICACIÓN
+// =============================================================================
+
+// Registro de usuario
+app.post('/api/auth/register', (req, res) => {
+  try {
+    const { username, password, nombre } = req.body;
+    if (!username || !username.trim()) {
+      return res.status(400).json({ error: 'El nombre de usuario es obligatorio' });
+    }
+    if (!password || password.trim().length < 4) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 4 caracteres' });
+    }
+
+    const cleanUsername = username.trim().toLowerCase();
+    const existing = UserRepo.getByUsername(cleanUsername);
+    if (existing) {
+      return res.status(409).json({ error: 'Este nombre de usuario ya está registrado' });
+    }
+
+    const user = UserRepo.create({
+      username: cleanUsername,
+      password: password.trim(),
+      nombre: nombre || cleanUsername
+    });
+
+    const session = SessionRepo.create(user.id);
+    res.cookie = `session_token=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 3600}`;
+    res.setHeader('Set-Cookie', `session_token=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 3600}`);
+
+    res.status(201).json({
+      success: true,
+      token: session.token,
+      user: { id: user.id, username: user.username, nombre: user.nombre }
+    });
+  } catch (error) {
+    console.error('Error en registro:', error);
+    res.status(500).json({ error: 'Error al registrar usuario: ' + error.message });
+  }
+});
+
+// Inicio de sesión
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
+    }
+
+    const cleanUsername = username.trim().toLowerCase();
+    const user = UserRepo.getByUsername(cleanUsername);
+    if (!user || !UserRepo.verifyPassword(user, password)) {
+      return res.status(401).json({ error: 'Credenciales incorrectas' });
+    }
+
+    const session = SessionRepo.create(user.id);
+    res.setHeader('Set-Cookie', `session_token=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 3600}`);
+
+    res.json({
+      success: true,
+      token: session.token,
+      user: { id: user.id, username: user.username, nombre: user.nombre }
+    });
+  } catch (error) {
+    console.error('Error en login:', error);
+    res.status(500).json({ error: 'Error al iniciar sesión' });
+  }
+});
+
+// Sesión actual / Me
+app.get('/api/auth/me', (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    let token = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7).trim();
+    }
+    if (!token) {
+      const cookies = parseCookies(req);
+      token = cookies['session_token'];
+    }
+
+    if (!token) {
+      return res.status(401).json({ authenticated: false });
+    }
+
+    const session = SessionRepo.getByToken(token);
+    if (!session) {
+      return res.status(401).json({ authenticated: false });
+    }
+
+    res.json({
+      authenticated: true,
+      user: {
+        id: session.userId,
+        username: session.username,
+        nombre: session.nombre
+      }
+    });
+  } catch (error) {
+    console.error('Error en auth/me:', error);
+    res.status(500).json({ error: 'Error al verificar sesión' });
+  }
+});
+
+// Cerrar sesión
+app.post('/api/auth/logout', (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    let token = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7).trim();
+    }
+    if (!token) {
+      const cookies = parseCookies(req);
+      token = cookies['session_token'];
+    }
+
+    if (token) {
+      SessionRepo.delete(token);
+    }
+
+    res.setHeader('Set-Cookie', 'session_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax');
+    res.json({ success: true, message: 'Sesión cerrada correctamente' });
+  } catch (error) {
+    console.error('Error en logout:', error);
+    res.status(500).json({ error: 'Error al cerrar sesión' });
+  }
+});
+
+// =============================================================================
+// API REST - CASAS / PROPIEDADES (Multi-casa)
+// =============================================================================
+
+// Listar todas las casas
+app.get('/api/casas', requireAuth, (req, res) => {
+  try {
+    const casas = CasaRepo.getAll();
+    res.json(casas);
+  } catch (error) {
+    console.error('Error al obtener casas:', error);
+    res.status(500).json({ error: 'Error al obtener casas en SQL' });
+  }
+});
+
+// Crear una nueva casa
+app.post('/api/casas', requireAuth, (req, res) => {
+  try {
+    const { nombre, icono, direccion, descripcion } = req.body;
+    if (!nombre || !nombre.trim()) {
+      return res.status(400).json({ error: 'El nombre de la casa es obligatorio' });
+    }
+
+    const trimmedNombre = nombre.trim();
+    const existing = CasaRepo.getByName(trimmedNombre);
+    if (existing) {
+      return res.status(409).json({ error: 'Ya existe una propiedad con este nombre' });
+    }
+
+    const nuevaCasa = CasaRepo.create({
+      nombre: trimmedNombre,
+      icono: icono || '🏡',
+      direccion,
+      descripcion
+    });
+
+    res.status(201).json(nuevaCasa);
+  } catch (error) {
+    console.error('Error al crear casa:', error);
+    res.status(500).json({ error: 'Error al crear casa en SQL' });
+  }
+});
+
+// Actualizar una casa
+app.put('/api/casas/:id', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, icono, direccion, descripcion } = req.body;
+
+    const existing = CasaRepo.getById(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Casa no encontrada' });
+    }
+
+    if (nombre && nombre.trim() !== existing.nombre) {
+      const conflict = CasaRepo.getByName(nombre.trim());
+      if (conflict && conflict.id !== id) {
+        return res.status(409).json({ error: 'Ya existe otra casa con ese nombre' });
+      }
+    }
+
+    const updated = CasaRepo.update(id, {
+      nombre,
+      icono,
+      direccion,
+      descripcion
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Error al actualizar casa:', error);
+    res.status(500).json({ error: 'Error al actualizar casa en SQL' });
+  }
+});
+
+// Eliminar una casa
+app.delete('/api/casas/:id', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = CasaRepo.delete(id);
+
+    if (!result.deleted) {
+      if (result.reason === 'has_items') {
+        return res.status(400).json({
+          error: `No se puede eliminar "${result.casaName}" porque contiene ${result.itemCount} artículo(s). Reasigna o elimina los artículos primero.`
+        });
+      }
+      if (result.reason === 'last_casa') {
+        return res.status(400).json({ error: result.message });
+      }
+      return res.status(404).json({ error: 'Casa no encontrada' });
+    }
+
+    res.json({ message: 'Casa eliminada exitosamente' });
+  } catch (error) {
+    console.error('Error al eliminar casa:', error);
+    res.status(500).json({ error: 'Error al eliminar casa en SQL' });
+  }
+});
+
+// =============================================================================
 // API REST - SECCIONES
 // =============================================================================
 
 // Listar todas las secciones
-app.get('/api/sections', (req, res) => {
+app.get('/api/sections', requireAuth, (req, res) => {
   try {
-    const sections = SectionRepo.getAll();
+    const casaId = req.query.casa_id || null;
+    const sections = SectionRepo.getAll(casaId);
     res.json(sections);
   } catch (error) {
     console.error('Error al obtener secciones:', error);
@@ -89,7 +373,7 @@ app.get('/api/sections', (req, res) => {
 });
 
 // Crear nueva sección
-app.post('/api/sections', (req, res) => {
+app.post('/api/sections', requireAuth, (req, res) => {
   try {
     const { nombre, icono, descripcion } = req.body;
     if (!nombre || !nombre.trim()) {
@@ -119,7 +403,7 @@ app.post('/api/sections', (req, res) => {
 });
 
 // Actualizar sección
-app.put('/api/sections/:id', (req, res) => {
+app.put('/api/sections/:id', requireAuth, (req, res) => {
   try {
     const { id } = req.params;
     const { nombre, icono, descripcion } = req.body;
@@ -151,7 +435,7 @@ app.put('/api/sections/:id', (req, res) => {
 });
 
 // Eliminar sección
-app.delete('/api/sections/:id', (req, res) => {
+app.delete('/api/sections/:id', requireAuth, (req, res) => {
   try {
     const { id } = req.params;
     const result = SectionRepo.delete(id);
@@ -177,7 +461,7 @@ app.delete('/api/sections/:id', (req, res) => {
 // =============================================================================
 
 // Listar todas las categorías
-app.get('/api/categories', (req, res) => {
+app.get('/api/categories', requireAuth, (req, res) => {
   try {
     const categories = CategoryRepo.getAll();
     res.json(categories);
@@ -188,7 +472,7 @@ app.get('/api/categories', (req, res) => {
 });
 
 // Crear nueva categoría
-app.post('/api/categories', (req, res) => {
+app.post('/api/categories', requireAuth, (req, res) => {
   try {
     const { nombre, icono } = req.body;
     if (!nombre || !nombre.trim()) {
@@ -216,13 +500,14 @@ app.post('/api/categories', (req, res) => {
 });
 
 // =============================================================================
-// API REST - ÍTEMS CON FOTOS, CANTIDAD Y CATEGORÍA
+// API REST - ÍTEMS CON FOTOS, CANTIDAD, CATEGORÍA Y CASA
 // =============================================================================
 
-// Listar todos los ítems
-app.get('/api/items', (req, res) => {
+// Listar todos los ítems (filtrable opcionalmente por ?casa_id=)
+app.get('/api/items', requireAuth, (req, res) => {
   try {
-    const items = ItemRepo.getAll();
+    const casaId = req.query.casa_id || null;
+    const items = ItemRepo.getAll(casaId);
     res.json(items);
   } catch (error) {
     console.error('Error al obtener ítems:', error);
@@ -231,9 +516,9 @@ app.get('/api/items', (req, res) => {
 });
 
 // Crear nuevo ítem
-app.post('/api/items', (req, res) => {
+app.post('/api/items', requireAuth, (req, res) => {
   try {
-    const { nombre, seccion, categoria, cantidad, estado, etiqueta_destino, precio_venta, notas, fotos } = req.body;
+    const { casa_id, nombre, seccion, categoria, cantidad, estado, etiqueta_destino, precio_venta, notas, fotos } = req.body;
     if (!nombre || !nombre.trim()) {
       return res.status(400).json({ error: 'El nombre del ítem es obligatorio' });
     }
@@ -244,12 +529,13 @@ app.post('/api/items', (req, res) => {
     const id = req.body.id || 'item_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
     const newItem = ItemRepo.create({
       id,
+      casa_id: casa_id || 'casa_floresta',
       nombre: nombre.trim(),
       seccion,
       categoria: categoria || 'Mobiliario',
       cantidad: Math.max(1, parseInt(cantidad, 10) || 1),
       estado: estado || 'Buen estado',
-      etiqueta_destino: etiqueta_destino || 'Guardar',
+      etiqueta_destino: etiqueta_destino || 'Almacenar',
       precio_venta,
       notas: notas ? notas.trim() : '',
       fotos: fotos || [],
@@ -264,10 +550,10 @@ app.post('/api/items', (req, res) => {
 });
 
 // Actualizar ítem
-app.put('/api/items/:id', (req, res) => {
+app.put('/api/items/:id', requireAuth, (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, seccion, categoria, cantidad, estado, etiqueta_destino, precio_venta, notas, fotos } = req.body;
+    const { casa_id, nombre, seccion, categoria, cantidad, estado, etiqueta_destino, precio_venta, notas, fotos } = req.body;
 
     const existing = ItemRepo.getById(id);
     if (!existing) {
@@ -275,6 +561,7 @@ app.put('/api/items/:id', (req, res) => {
     }
 
     const updated = ItemRepo.update(id, {
+      casa_id,
       nombre: nombre ? nombre.trim() : undefined,
       seccion,
       categoria,
@@ -294,7 +581,7 @@ app.put('/api/items/:id', (req, res) => {
 });
 
 // Eliminar ítem
-app.delete('/api/items/:id', (req, res) => {
+app.delete('/api/items/:id', requireAuth, (req, res) => {
   try {
     const { id } = req.params;
     const success = ItemRepo.delete(id);
@@ -309,7 +596,7 @@ app.delete('/api/items/:id', (req, res) => {
 });
 
 // Subida de fotos (Multipart)
-app.post('/api/upload', upload.array('fotos', 10), (req, res) => {
+app.post('/api/upload', requireAuth, upload.array('fotos', 10), (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No se subió ninguna imagen' });
@@ -331,11 +618,12 @@ app.post('/api/upload', upload.array('fotos', 10), (req, res) => {
   }
 });
 
-// Exportación CSV directo desde SQL
-app.get('/api/export', (req, res) => {
+// Exportación CSV directo desde SQL (soporta ?casa_id=)
+app.get('/api/export', requireAuth, (req, res) => {
   try {
-    const items = ItemRepo.getAll();
-    const headers = ['id', 'nombre', 'seccion', 'categoria', 'cantidad', 'estado', 'etiqueta_destino', 'precio_venta', 'notas', 'fotos', 'fecha_registro'];
+    const casaId = req.query.casa_id || null;
+    const items = ItemRepo.getAll(casaId);
+    const headers = ['id', 'casa_id', 'nombre', 'seccion', 'categoria', 'cantidad', 'estado', 'etiqueta_destino', 'precio_venta', 'notas', 'fotos', 'fecha_registro'];
 
     const escapeCSV = (val) => {
       if (val === null || val === undefined) return '';
@@ -348,6 +636,7 @@ app.get('/api/export', (req, res) => {
 
     const rows = items.map(i => [
       escapeCSV(i.id),
+      escapeCSV(i.casa_id),
       escapeCSV(i.nombre),
       escapeCSV(i.seccion),
       escapeCSV(i.categoria || 'Mobiliario'),
@@ -376,7 +665,7 @@ app.get('/api/export', (req, res) => {
 // =============================================================================
 
 // Exportar copia de seguridad completa en ZIP
-app.get('/api/backup/export', (req, res) => {
+app.get('/api/backup/export', requireAuth, (req, res) => {
   try {
     flushAndCheckpoint();
 
@@ -437,7 +726,7 @@ const zipUpload = multer({
 });
 
 // Restaurar copia de seguridad desde archivo ZIP
-app.post('/api/backup/restore', zipUpload.single('backup_zip'), (req, res) => {
+app.post('/api/backup/restore', requireAuth, zipUpload.single('backup_zip'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No se envió ningún archivo de respaldo (.zip)' });

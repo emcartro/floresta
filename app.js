@@ -16,13 +16,21 @@ const STORE_CATEGORIES = 'categories';
 
 // Estado global de la aplicación
 const state = {
+  // Autenticación y usuario actual
+  currentUser: null,
+  authToken: localStorage.getItem('inventario_token') || null,
+
+  // Multi-casas / Propiedades
+  casas: [],
+  selectedCasaId: localStorage.getItem('inventario_selected_casa') || null,
+
   currentView: 'inventory', // 'inventory' | 'sections'
   viewMode: 'cards',        // 'cards' | 'list'
   sections: [],
   categories: [],
   items: [],
   selectedSection: 'ALL',   // 'ALL' o nombre de la sección
-  selectedTag: 'ALL',       // 'ALL', 'Guardar', 'Llevar', 'Donar', 'Vender'
+  selectedTag: 'ALL',       // 'ALL', 'Almacenar', 'Llevar', 'Donar', 'Vender'
   selectedCategory: 'ALL',  // 'ALL' o nombre de la categoría
   searchQuery: '',
   sortBy: 'recent',
@@ -110,18 +118,108 @@ async function readFromIndexedDB(storeName) {
 }
 
 // =============================================================================
-// CLIENTE API REST (CONEXIÓN CON BACKEND SQL)
+// CLIENTE API REST (CONEXIÓN CON BACKEND SQL + AUTH + MULTI-CASA)
 // =============================================================================
 
 const api = {
+  getAuthHeaders(extraHeaders = {}) {
+    const headers = { ...extraHeaders };
+    if (state.authToken) {
+      headers['Authorization'] = `Bearer ${state.authToken}`;
+    }
+    return headers;
+  },
+
+  async authMe() {
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: this.getAuthHeaders()
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.authenticated ? data.user : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  async login(username, password) {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Error al iniciar sesión');
+    }
+    return data;
+  },
+
+  async register(username, password, nombre) {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, nombre })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Error al crear cuenta');
+    }
+    return data;
+  },
+
+  async logout() {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: this.getAuthHeaders()
+      });
+    } catch (e) {}
+    localStorage.removeItem('inventario_token');
+    state.authToken = null;
+    state.currentUser = null;
+  },
+
+  // Casas / Propiedades
+  async getCasas() {
+    const res = await fetch('/api/casas', {
+      headers: this.getAuthHeaders()
+    });
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('AUTH_REQUIRED');
+      throw new Error('Error al cargar propiedades');
+    }
+    return await res.json();
+  },
+
+  async createCasa(casaData) {
+    const res = await fetch('/api/casas', {
+      method: 'POST',
+      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(casaData)
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Error al crear propiedad');
+    }
+    return data;
+  },
+
   async getCategories() {
     try {
-      const res = await fetch('/api/categories');
-      if (!res.ok) throw new Error('Error al cargar categorías');
+      const res = await fetch('/api/categories', {
+        headers: this.getAuthHeaders()
+      });
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('AUTH_REQUIRED');
+        throw new Error('Error al cargar categorías');
+      }
       const data = await res.json();
       cacheToIndexedDB(STORE_CATEGORIES, data);
       return data;
     } catch (err) {
+      if (err.message === 'AUTH_REQUIRED') throw err;
       console.warn('API no disponible, leyendo categorías desde IndexedDB...');
       return await readFromIndexedDB(STORE_CATEGORIES);
     }
@@ -130,7 +228,7 @@ const api = {
   async createCategory(categoryData) {
     const res = await fetch('/api/categories', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(categoryData)
     });
     if (!res.ok) {
@@ -140,14 +238,21 @@ const api = {
     return await res.json();
   },
 
-  async getSections() {
+  async getSections(casaId = null) {
     try {
-      const res = await fetch('/api/sections');
-      if (!res.ok) throw new Error('Error de servidor al cargar secciones');
+      const url = casaId ? `/api/sections?casa_id=${encodeURIComponent(casaId)}` : '/api/sections';
+      const res = await fetch(url, {
+        headers: this.getAuthHeaders()
+      });
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('AUTH_REQUIRED');
+        throw new Error('Error de servidor al cargar secciones');
+      }
       const data = await res.json();
       cacheToIndexedDB(STORE_SECTIONS, data);
       return data;
     } catch (err) {
+      if (err.message === 'AUTH_REQUIRED') throw err;
       console.warn('API no disponible, leyendo secciones desde IndexedDB...');
       return await readFromIndexedDB(STORE_SECTIONS);
     }
@@ -156,7 +261,7 @@ const api = {
   async createSection(sectionData) {
     const res = await fetch('/api/sections', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(sectionData)
     });
     if (!res.ok) {
@@ -169,7 +274,7 @@ const api = {
   async updateSection(id, sectionData) {
     const res = await fetch(`/api/sections/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(sectionData)
     });
     if (!res.ok) {
@@ -180,7 +285,10 @@ const api = {
   },
 
   async deleteSection(id) {
-    const res = await fetch(`/api/sections/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/sections/${id}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders()
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Error al eliminar sección en SQL');
@@ -188,14 +296,21 @@ const api = {
     return await res.json();
   },
 
-  async getItems() {
+  async getItems(casaId = null) {
     try {
-      const res = await fetch('/api/items');
-      if (!res.ok) throw new Error('Error al cargar ítems');
+      const url = casaId ? `/api/items?casa_id=${encodeURIComponent(casaId)}` : '/api/items';
+      const res = await fetch(url, {
+        headers: this.getAuthHeaders()
+      });
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('AUTH_REQUIRED');
+        throw new Error('Error al cargar ítems');
+      }
       const data = await res.json();
       cacheToIndexedDB(STORE_ITEMS, data);
       return data;
     } catch (err) {
+      if (err.message === 'AUTH_REQUIRED') throw err;
       console.warn('API no disponible, leyendo ítems desde IndexedDB...');
       return await readFromIndexedDB(STORE_ITEMS);
     }
@@ -204,7 +319,7 @@ const api = {
   async createItem(itemData) {
     const res = await fetch('/api/items', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(itemData)
     });
     if (!res.ok) {
@@ -217,7 +332,7 @@ const api = {
   async updateItem(id, itemData) {
     const res = await fetch(`/api/items/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(itemData)
     });
     if (!res.ok) {
@@ -228,7 +343,10 @@ const api = {
   },
 
   async deleteItem(id) {
-    const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/items/${id}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders()
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Error al eliminar ítem en SQL');
@@ -243,6 +361,7 @@ const api = {
 
     const res = await fetch('/api/upload', {
       method: 'POST',
+      headers: this.getAuthHeaders(),
       body: formData
     });
     if (!res.ok) {
@@ -1064,6 +1183,7 @@ function openModalForAdd() {
   
   itemForm.reset();
   document.getElementById('item-id').value = '';
+  document.getElementById('form-item-casa-id').value = state.selectedCasaId || 'casa_floresta';
   document.getElementById('error-nombre').textContent = '';
   document.getElementById('error-precio').textContent = '';
 
@@ -1100,6 +1220,7 @@ function openModalForEdit(id) {
   document.getElementById('btn-save-text').textContent = 'Actualizar Ítem';
 
   document.getElementById('item-id').value = item.id;
+  document.getElementById('form-item-casa-id').value = item.casa_id || state.selectedCasaId || 'casa_floresta';
   document.getElementById('form-nombre').value = item.nombre;
   
   updateSectionDropdownInItemModal();
@@ -1438,9 +1559,12 @@ itemForm.addEventListener('submit', async (e) => {
 
     const finalPhotos = [...existingPhotoUrls, ...newlyUploadedUrls];
 
+    const itemCasaId = document.getElementById('form-item-casa-id').value || state.selectedCasaId || 'casa_floresta';
+
     if (state.editingItemId) {
       // Actualizar en SQL
       const updated = await api.updateItem(state.editingItemId, {
+        casa_id: itemCasaId,
         nombre: nombreVal,
         seccion: seccionVal,
         categoria: categoriaVal,
@@ -1458,6 +1582,7 @@ itemForm.addEventListener('submit', async (e) => {
     } else {
       // Crear en SQL
       const created = await api.createItem({
+        casa_id: itemCasaId,
         nombre: nombreVal,
         seccion: seccionVal,
         categoria: categoriaVal,
@@ -1602,8 +1727,10 @@ lightboxModal.addEventListener('click', (e) => {
 // =============================================================================
 
 function exportInventoryToCSV() {
-  // Descarga directa desde la API SQL del backend con fallback local
-  window.location.href = '/api/export';
+  const tokenParam = state.authToken ? `&token=${encodeURIComponent(state.authToken)}` : '';
+  const casaParam = state.selectedCasaId ? `casa_id=${encodeURIComponent(state.selectedCasaId)}` : '';
+  const url = `/api/export?${casaParam}${tokenParam}`;
+  window.location.href = url;
   showToast('Descargando inventario_hogar.csv con todas las fotos...');
 }
 
@@ -1738,10 +1865,11 @@ function setupEventListeners() {
     if (e.target === backupModal) backupModal.classList.add('hidden');
   });
 
-  // Descarga de copia de seguridad ZIP
+  // Descarga de copia de seguridad ZIP (con token de sesión)
   document.getElementById('btn-download-backup-zip').addEventListener('click', () => {
     showToast('Generando y descargando respaldo ZIP con fotos...', 'info');
-    window.location.href = '/api/backup/export';
+    const tokenParam = state.authToken ? `?token=${encodeURIComponent(state.authToken)}` : '';
+    window.location.href = `/api/backup/export${tokenParam}`;
   });
 
   // Selección de archivo ZIP para restaurar
@@ -1786,6 +1914,7 @@ function setupEventListeners() {
 
       const res = await fetch('/api/backup/restore', {
         method: 'POST',
+        headers: api.getAuthHeaders(),
         body: formData
       });
 
@@ -1798,14 +1927,7 @@ function setupEventListeners() {
       backupModal.classList.add('hidden');
 
       // Recargar datos desde la base de datos restaurada
-      const [sections, items] = await Promise.all([
-        api.getSections(),
-        api.getItems()
-      ]);
-      state.sections = sections || [];
-      state.items = items || [];
-      renderInventoryView();
-      renderSectionsManageView();
+      await reloadAppData();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -1952,31 +2074,337 @@ function registerServiceWorker() {
 }
 
 // =============================================================================
+// GESTIÓN DE AUTENTICACIÓN Y MULTI-CASA EN EL FRONTEND
+// =============================================================================
+
+const authGateOverlay = document.getElementById('auth-gate-overlay');
+const formLogin = document.getElementById('form-login');
+const formRegister = document.getElementById('form-register');
+const tabAuthLogin = document.getElementById('tab-auth-login');
+const tabAuthRegister = document.getElementById('tab-auth-register');
+const authErrorMsg = document.getElementById('auth-error-msg');
+const authRegErrorMsg = document.getElementById('auth-reg-error-msg');
+
+const btnPropertyDropdown = document.getElementById('btn-property-dropdown');
+const propertyDropdownMenu = document.getElementById('property-dropdown-menu');
+const propertyListContainer = document.getElementById('property-list-container');
+const currentPropertyIcon = document.getElementById('current-property-icon');
+const currentPropertyName = document.getElementById('current-property-name');
+const btnOpenNewProperty = document.getElementById('btn-open-new-property');
+const propertyModalOverlay = document.getElementById('property-modal-overlay');
+const propertyForm = document.getElementById('property-form');
+const btnCancelPropModal = document.getElementById('btn-cancel-prop-modal');
+const propEmojiPicker = document.getElementById('prop-emoji-picker');
+
+const btnUserProfile = document.getElementById('btn-user-profile');
+const userDropdownMenu = document.getElementById('user-dropdown-menu');
+const userAvatarInitials = document.getElementById('user-avatar-initials');
+const userDisplayName = document.getElementById('user-display-name');
+const userDisplayUsername = document.getElementById('user-display-username');
+const btnLogout = document.getElementById('btn-logout');
+
+function showAuthGate() {
+  if (authGateOverlay) authGateOverlay.classList.remove('hidden');
+}
+
+function hideAuthGate() {
+  if (authGateOverlay) authGateOverlay.classList.add('hidden');
+}
+
+function updateUserInfoUI(user) {
+  if (!user) return;
+  state.currentUser = user;
+  const name = user.nombre || user.username || 'Usuario';
+  if (userDisplayName) userDisplayName.textContent = name;
+  if (userDisplayUsername) userDisplayUsername.textContent = `@${user.username}`;
+  
+  if (userAvatarInitials) {
+    const parts = name.trim().split(/\s+/);
+    let initials = parts[0] ? parts[0][0].toUpperCase() : 'U';
+    if (parts.length > 1 && parts[1]) initials += parts[1][0].toUpperCase();
+    userAvatarInitials.textContent = initials.substring(0, 2);
+  }
+}
+
+function renderPropertySwitcher() {
+  if (!state.casas || state.casas.length === 0) return;
+
+  // Seleccionar la casa activa o la primera si no hay seleccionada
+  let activeCasa = state.casas.find(c => c.id === state.selectedCasaId);
+  if (!activeCasa) {
+    activeCasa = state.casas[0];
+    state.selectedCasaId = activeCasa.id;
+    localStorage.setItem('inventario_selected_casa', activeCasa.id);
+  }
+
+  if (currentPropertyIcon) currentPropertyIcon.textContent = activeCasa.icono || '🏡';
+  if (currentPropertyName) currentPropertyName.textContent = activeCasa.nombre || 'Mi Casa';
+
+  if (!propertyListContainer) return;
+  propertyListContainer.innerHTML = '';
+
+  state.casas.forEach(casa => {
+    const isActive = casa.id === state.selectedCasaId;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `property-menu-item ${isActive ? 'active' : ''}`;
+    btn.innerHTML = `
+      <div class="property-item-left">
+        <span class="property-item-icon">${casa.icono || '🏡'}</span>
+        <span class="property-item-name">${escapeHTML(casa.nombre)}</span>
+      </div>
+      <span class="property-badge-count">${casa.item_count || 0} ítems</span>
+    `;
+
+    btn.addEventListener('click', async () => {
+      if (state.selectedCasaId !== casa.id) {
+        state.selectedCasaId = casa.id;
+        localStorage.setItem('inventario_selected_casa', casa.id);
+        if (propertyDropdownMenu) propertyDropdownMenu.classList.add('hidden');
+        showToast(`Cambiando a ${casa.nombre}...`);
+        await reloadAppData();
+      } else {
+        if (propertyDropdownMenu) propertyDropdownMenu.classList.add('hidden');
+      }
+    });
+
+    propertyListContainer.appendChild(btn);
+  });
+}
+
+async function reloadAppData() {
+  try {
+    const [casas, categories, sections, items] = await Promise.all([
+      api.getCasas(),
+      api.getCategories(),
+      api.getSections(state.selectedCasaId),
+      api.getItems(state.selectedCasaId)
+    ]);
+
+    state.casas = casas || [];
+    state.categories = categories || [];
+    state.sections = sections || [];
+    state.items = items || [];
+
+    renderPropertySwitcher();
+    renderInventoryView();
+    renderSectionsManageView();
+  } catch (err) {
+    if (err.message === 'AUTH_REQUIRED') {
+      showAuthGate();
+    } else {
+      console.error('Error al recargar datos:', err);
+      showToast('Error cargando datos de la propiedad', 'error');
+    }
+  }
+}
+
+function setupAuthAndCasasEvents() {
+  // Pestañas de Login / Registro
+  if (tabAuthLogin && tabAuthRegister) {
+    tabAuthLogin.addEventListener('click', () => {
+      tabAuthLogin.classList.add('active');
+      tabAuthRegister.classList.remove('active');
+      formLogin.classList.remove('hidden');
+      formRegister.classList.add('hidden');
+    });
+
+    tabAuthRegister.addEventListener('click', () => {
+      tabAuthRegister.classList.add('active');
+      tabAuthLogin.classList.remove('active');
+      formRegister.classList.remove('hidden');
+      formLogin.classList.add('hidden');
+    });
+  }
+
+  // Enviar Login
+  if (formLogin) {
+    formLogin.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (authErrorMsg) authErrorMsg.classList.add('hidden');
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+
+      try {
+        const data = await api.login(username, password);
+        state.authToken = data.token;
+        localStorage.setItem('inventario_token', data.token);
+        updateUserInfoUI(data.user);
+        hideAuthGate();
+        showToast(`¡Bienvenido, ${data.user.nombre || data.user.username}!`);
+        await reloadAppData();
+      } catch (err) {
+        if (authErrorMsg) {
+          authErrorMsg.textContent = err.message || 'Error al iniciar sesión';
+          authErrorMsg.classList.remove('hidden');
+        }
+      }
+    });
+  }
+
+  // Enviar Registro
+  if (formRegister) {
+    formRegister.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (authRegErrorMsg) authRegErrorMsg.classList.add('hidden');
+      const nombre = document.getElementById('reg-name').value.trim();
+      const username = document.getElementById('reg-username').value.trim();
+      const password = document.getElementById('reg-password').value;
+
+      try {
+        const data = await api.register(username, password, nombre);
+        state.authToken = data.token;
+        localStorage.setItem('inventario_token', data.token);
+        updateUserInfoUI(data.user);
+        hideAuthGate();
+        showToast(`¡Cuenta creada con éxito! Bienvenido, ${data.user.nombre}.`);
+        await reloadAppData();
+      } catch (err) {
+        if (authRegErrorMsg) {
+          authRegErrorMsg.textContent = err.message || 'Error al registrar usuario';
+          authRegErrorMsg.classList.remove('hidden');
+        }
+      }
+    });
+  }
+
+  // Dropdown de Casas
+  if (btnPropertyDropdown && propertyDropdownMenu) {
+    btnPropertyDropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+      propertyDropdownMenu.classList.toggle('hidden');
+      if (userDropdownMenu) userDropdownMenu.classList.add('hidden');
+    });
+  }
+
+  // Dropdown de Usuario / Perfil
+  if (btnUserProfile && userDropdownMenu) {
+    btnUserProfile.addEventListener('click', (e) => {
+      e.stopPropagation();
+      userDropdownMenu.classList.toggle('hidden');
+      if (propertyDropdownMenu) propertyDropdownMenu.classList.add('hidden');
+    });
+  }
+
+  // Cerrar sesión
+  if (btnLogout) {
+    btnLogout.addEventListener('click', async () => {
+      if (userDropdownMenu) userDropdownMenu.classList.add('hidden');
+      await api.logout();
+      showToast('Sesión cerrada correctamente');
+      showAuthGate();
+    });
+  }
+
+  // Cerrar menús al hacer clic fuera
+  document.addEventListener('click', (e) => {
+    if (propertyDropdownMenu && !propertyDropdownMenu.classList.contains('hidden')) {
+      if (!propertyDropdownMenu.contains(e.target) && !btnPropertyDropdown.contains(e.target)) {
+        propertyDropdownMenu.classList.add('hidden');
+      }
+    }
+    if (userDropdownMenu && !userDropdownMenu.classList.contains('hidden')) {
+      if (!userDropdownMenu.contains(e.target) && !btnUserProfile.contains(e.target)) {
+        userDropdownMenu.classList.add('hidden');
+      }
+    }
+  });
+
+  // Modal para agregar nueva casa
+  if (btnOpenNewProperty) {
+    btnOpenNewProperty.addEventListener('click', () => {
+      if (propertyDropdownMenu) propertyDropdownMenu.classList.add('hidden');
+      if (propertyForm) propertyForm.reset();
+      document.getElementById('prop-icono').value = '🏡';
+      const defaultEmoji = propEmojiPicker?.querySelector('[data-emoji="🏡"]');
+      if (defaultEmoji) {
+        propEmojiPicker.querySelectorAll('.btn-emoji').forEach(b => b.classList.remove('active'));
+        defaultEmoji.classList.add('active');
+      }
+      if (propertyModalOverlay) propertyModalOverlay.classList.remove('hidden');
+      document.getElementById('prop-nombre').focus();
+    });
+  }
+
+  if (btnCancelPropModal && propertyModalOverlay) {
+    btnCancelPropModal.addEventListener('click', () => {
+      propertyModalOverlay.classList.add('hidden');
+    });
+    propertyModalOverlay.addEventListener('click', (e) => {
+      if (e.target === propertyModalOverlay) propertyModalOverlay.classList.add('hidden');
+    });
+  }
+
+  if (propEmojiPicker) {
+    propEmojiPicker.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-emoji');
+      if (btn && btn.dataset.emoji) {
+        propEmojiPicker.querySelectorAll('.btn-emoji').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('prop-icono').value = btn.dataset.emoji;
+      }
+    });
+  }
+
+  if (propertyForm) {
+    propertyForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById('prop-nombre').value.trim();
+      const icono = document.getElementById('prop-icono').value || '🏡';
+      const direccion = document.getElementById('prop-direccion').value.trim();
+      const descripcion = document.getElementById('prop-desc').value.trim();
+
+      if (!nombre) {
+        showToast('El nombre de la propiedad es requerido', 'error');
+        return;
+      }
+
+      try {
+        const nuevaCasa = await api.createCasa({ nombre, icono, direccion, descripcion });
+        state.casas.push(nuevaCasa);
+        state.selectedCasaId = nuevaCasa.id;
+        localStorage.setItem('inventario_selected_casa', nuevaCasa.id);
+        
+        propertyModalOverlay.classList.add('hidden');
+        showToast(`¡Propiedad "${nuevaCasa.nombre}" creada y seleccionada!`);
+        await reloadAppData();
+      } catch (err) {
+        showToast(err.message || 'Error al crear propiedad', 'error');
+      }
+    });
+  }
+}
+
+// =============================================================================
 // INICIALIZACIÓN GENERAL DE LA APP
 // =============================================================================
 
 async function initApp() {
   setupEventListeners();
+  setupAuthAndCasasEvents();
   registerServiceWorker();
   await initIndexedDB();
 
   try {
-    // Cargar categorías, secciones e ítems desde SQL (con fallback IndexedDB automático)
-    const [categories, sections, items] = await Promise.all([
-      api.getCategories(),
-      api.getSections(),
-      api.getItems()
-    ]);
+    // 1. Verificar si hay sesión activa
+    const me = await api.authMe();
+    if (!me) {
+      showAuthGate();
+      return;
+    }
 
-    state.categories = categories || [];
-    state.sections = sections || [];
-    state.items = items || [];
+    updateUserInfoUI(me);
+    hideAuthGate();
 
-    renderInventoryView();
-    renderSectionsManageView();
+    // 2. Cargar casas y datos del inventario
+    await reloadAppData();
   } catch (err) {
     console.error('Error inicializando aplicación:', err);
-    showToast('Error cargando datos iniciales', 'error');
+    if (err.message === 'AUTH_REQUIRED') {
+      showAuthGate();
+    } else {
+      showToast('Error cargando datos iniciales', 'error');
+    }
   }
 }
 

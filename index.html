@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
   <!-- Offline status alert -->
@@ -48,6 +48,28 @@
         </div>
 
         <div class="header-actions">
+          <!-- Selector de Casa / Propiedad -->
+          <div class="property-switcher-box">
+            <button id="btn-property-dropdown" class="btn-property-switch" aria-haspopup="true" aria-expanded="false" title="Cambiar propiedad activa">
+              <span id="current-property-icon" class="property-icon">🏡</span>
+              <span id="current-property-name" class="property-name">Casa Floresta</span>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+            <div id="property-dropdown-menu" class="property-dropdown-menu hidden" role="menu">
+              <div class="dropdown-header">Mis Propiedades / Casas</div>
+              <div id="property-list-container" class="property-list-items">
+                <!-- Inyectado dinámicamente con JS -->
+              </div>
+              <div class="dropdown-divider"></div>
+              <button type="button" id="btn-open-new-property" class="dropdown-item-btn item-btn-accent">
+                <span>➕</span>
+                <span>Agregar otra casa</span>
+              </button>
+            </div>
+          </div>
+
           <button id="btn-open-backup" class="btn btn-secondary btn-icon" title="Copia de Seguridad y Restauración (ZIP)" aria-label="Copia de Seguridad">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
@@ -78,6 +100,26 @@
             </svg>
             <span>Nuevo Ítem</span>
           </button>
+
+          <!-- Botón de Usuario / Cerrar Sesión -->
+          <div class="user-menu-box">
+            <button id="btn-user-profile" class="btn-user-avatar" title="Perfil y Sesión" aria-haspopup="true" aria-expanded="false">
+              <span id="user-avatar-initials">AD</span>
+            </button>
+            <div id="user-dropdown-menu" class="user-dropdown-menu hidden" role="menu">
+              <div class="user-dropdown-header">
+                <div class="user-info-name" id="user-display-name">Administrador</div>
+                <div class="user-info-user" id="user-display-username">@admin</div>
+              </div>
+              <div class="dropdown-divider"></div>
+              <button type="button" id="btn-logout" class="dropdown-item-btn text-danger">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+                </svg>
+                <span>Cerrar Sesión</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -464,6 +506,7 @@
 
       <form id="item-form" class="modal-form" novalidate>
         <input type="hidden" id="item-id">
+        <input type="hidden" id="form-item-casa-id">
 
         <!-- Campo Nombre -->
         <div class="form-group">
@@ -916,9 +959,134 @@
     </div>
   </div>
 
+  <!-- ===================================================================== -->
+  <!-- MODAL: CREAR NUEVA CASA / PROPIEDAD                                   -->
+  <!-- ===================================================================== -->
+  <div id="property-modal-overlay" class="modal-overlay hidden" aria-hidden="true">
+    <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="property-modal-title">
+      <div class="confirm-header">
+        <div class="confirm-icon" style="background: rgba(37, 99, 235, 0.12); color: var(--color-primary);">
+          <span>🏡</span>
+        </div>
+        <div>
+          <h3 id="property-modal-title" class="confirm-title">Nueva Propiedad / Casa</h3>
+          <p class="confirm-desc">Crea un inventario independiente para otra casa o apartamento</p>
+        </div>
+      </div>
+
+      <form id="property-form" style="margin-top: 16px;">
+        <div class="form-group">
+          <label for="prop-nombre" class="form-label">Nombre de la Propiedad <span class="required-indicator">*</span></label>
+          <input type="text" id="prop-nombre" class="form-input" placeholder="Ej. Casa Campestre, Apto Poblado, Finca..." required maxlength="60">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ícono Representativo</label>
+          <div class="emoji-picker-row" id="prop-emoji-picker">
+            <button type="button" class="btn-emoji active" data-emoji="🏡">🏡</button>
+            <button type="button" class="btn-emoji" data-emoji="🏠">🏠</button>
+            <button type="button" class="btn-emoji" data-emoji="🏢">🏢</button>
+            <button type="button" class="btn-emoji" data-emoji="🏖️">🏖️</button>
+            <button type="button" class="btn-emoji" data-emoji="🌲">🌲</button>
+            <button type="button" class="btn-emoji" data-emoji="⛺">⛺</button>
+            <button type="button" class="btn-emoji" data-emoji="🏚️">🏚️</button>
+            <button type="button" class="btn-emoji" data-emoji="🏬">🏬</button>
+          </div>
+          <input type="hidden" id="prop-icono" value="🏡">
+        </div>
+
+        <div class="form-group">
+          <label for="prop-direccion" class="form-label">Dirección / Ubicación <span class="optional-badge">(opcional)</span></label>
+          <input type="text" id="prop-direccion" class="form-input" placeholder="Ej. Km 4 Vía Las Palmas, Calle 10 # 30..." maxlength="100">
+        </div>
+
+        <div class="form-group">
+          <label for="prop-desc" class="form-label">Descripción o Notas <span class="optional-badge">(opcional)</span></label>
+          <textarea id="prop-desc" class="form-textarea" rows="2" placeholder="Notas sobre esta casa o inventario..." maxlength="200"></textarea>
+        </div>
+
+        <div class="confirm-actions" style="margin-top: 12px;">
+          <button type="button" id="btn-cancel-prop-modal" class="btn btn-secondary flex-1">Cancelar</button>
+          <button type="submit" class="btn btn-primary flex-1">Crear Propiedad</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- PANTALLA / OVERLAY DE AUTENTICACIÓN (LOGIN / REGISTRO)                -->
+  <!-- ===================================================================== -->
+  <div id="auth-gate-overlay" class="auth-gate-overlay hidden" aria-modal="true" role="dialog">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-logo-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
+        <h2 class="auth-title">Inventario Hogar</h2>
+        <p class="auth-subtitle">Acceso seguro a tus pertenencias e inventarios</p>
+      </div>
+
+      <!-- Pestañas Login / Registro -->
+      <div class="auth-tabs" role="tablist">
+        <button type="button" id="tab-auth-login" class="auth-tab-btn active" role="tab">Iniciar Sesión</button>
+        <button type="button" id="tab-auth-register" class="auth-tab-btn" role="tab">Crear Cuenta</button>
+      </div>
+
+      <!-- Formulario Login -->
+      <form id="form-login" class="auth-form">
+        <div class="form-group">
+          <label for="login-username" class="form-label">Usuario</label>
+          <input type="text" id="login-username" class="form-input" placeholder="admin o tu usuario" autocomplete="username" required>
+        </div>
+
+        <div class="form-group">
+          <label for="login-password" class="form-label">Contraseña</label>
+          <input type="password" id="login-password" class="form-input" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+
+        <div id="auth-error-msg" class="auth-error-alert hidden"></div>
+
+        <button type="submit" id="btn-submit-login" class="btn btn-primary auth-btn-submit">
+          <span>Ingresar al Inventario</span>
+        </button>
+
+        <p class="auth-demo-hint">
+          💡 <strong>Acceso inicial:</strong> Usuario: <code>admin</code> / Contraseña: <code>admin123</code>
+        </p>
+      </form>
+
+      <!-- Formulario Registro -->
+      <form id="form-register" class="auth-form hidden">
+        <div class="form-group">
+          <label for="reg-name" class="form-label">Nombre Completo</label>
+          <input type="text" id="reg-name" class="form-input" placeholder="Ej. Carlos Pérez" autocomplete="name">
+        </div>
+
+        <div class="form-group">
+          <label for="reg-username" class="form-label">Nombre de Usuario <span class="required-indicator">*</span></label>
+          <input type="text" id="reg-username" class="form-input" placeholder="Ej. carlosp" autocomplete="username" required minlength="3">
+        </div>
+
+        <div class="form-group">
+          <label for="reg-password" class="form-label">Contraseña <span class="required-indicator">*</span></label>
+          <input type="password" id="reg-password" class="form-input" placeholder="Mínimo 4 caracteres" autocomplete="new-password" required minlength="4">
+        </div>
+
+        <div id="auth-reg-error-msg" class="auth-error-alert hidden"></div>
+
+        <button type="submit" id="btn-submit-register" class="btn btn-primary auth-btn-submit">
+          <span>Crear Cuenta y Entrar</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
