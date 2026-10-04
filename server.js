@@ -344,32 +344,33 @@ app.get('/api/backup/export', (req, res) => {
     const dateStr = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
     const zipFilename = `backup_inventario_${dateStr}.zip`;
 
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
-
-    const archive = archiver('zip', { zlib: { level: 9 } });
-
-    archive.on('error', (err) => {
-      console.error('Error generando backup ZIP:', err);
-      if (!res.headersSent) res.status(500).send('Error creando respaldo ZIP');
-    });
-
-    archive.pipe(res);
+    const zip = new AdmZip();
 
     // 1. Metadatos del respaldo
-    archive.append(JSON.stringify(backupInfo, null, 2), { name: 'backup_info.json' });
+    zip.addFile('backup_info.json', Buffer.from(JSON.stringify(backupInfo, null, 2), 'utf-8'));
 
     // 2. Base de datos SQLite completa
     if (fs.existsSync(DB_PATH)) {
-      archive.file(DB_PATH, { name: 'inventario.sqlite' });
+      zip.addLocalFile(DB_PATH);
     }
 
     // 3. Carpeta de fotos completas
     if (fs.existsSync(UPLOADS_DIR)) {
-      archive.directory(UPLOADS_DIR, 'uploads');
+      const uploadFiles = fs.readdirSync(UPLOADS_DIR);
+      uploadFiles.forEach(file => {
+        const fullPath = path.join(UPLOADS_DIR, file);
+        if (fs.statSync(fullPath).isFile()) {
+          zip.addLocalFile(fullPath, 'uploads');
+        }
+      });
     }
 
-    archive.finalize();
+    const zipBuffer = zip.toBuffer();
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
+    res.setHeader('Content-Length', zipBuffer.length);
+    res.send(zipBuffer);
   } catch (error) {
     console.error('Error al exportar backup ZIP:', error);
     if (!res.headersSent) res.status(500).json({ error: 'Error al exportar copia de seguridad' });
