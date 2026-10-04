@@ -719,51 +719,152 @@ body {
   background: var(--bg-subtle);
 }
 
-/* Room Breakdown Card */
-.room-breakdown-card {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 16px;
-  margin-bottom: 20px;
-  box-shadow: var(--shadow-sm);
+.btn-mini-toggle.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 700;
 }
 
-.breakdown-header {
+/* Room Breakdown / Filtros Drawer Card */
+.room-breakdown-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 22px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+  animation: slideDownFade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.filters-expanded-card .breakdown-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
 }
 
-.breakdown-header h3 {
-  font-size: 0.95rem;
+.filters-card-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+}
+
+.filters-card-header-title h3 {
+  font-size: 1rem;
   font-weight: 700;
+  margin: 0;
+}
+
+.filters-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-text-subtle {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+
+.btn-text-subtle:hover {
+  text-decoration: underline;
+  background: var(--primary-light);
+}
+
+.filters-expanded-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.filter-group-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-group-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.filter-rooms-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-group-hint {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  font-weight: 500;
 }
 
 .breakdown-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .breakdown-item {
-  padding: 10px;
+  padding: 9px 12px;
   background: var(--bg-subtle);
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   cursor: pointer;
   transition: all var(--transition);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .breakdown-item:hover {
   background: white;
   border-color: var(--primary);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+}
+
+.breakdown-item.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.breakdown-item.active .breakdown-name {
+  color: var(--primary);
+  font-weight: 800;
 }
 
 .breakdown-name {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--text-primary);
   display: block;
@@ -774,7 +875,12 @@ body {
   gap: 4px;
   font-size: 0.72rem;
   color: var(--text-tertiary);
-  margin-top: 4px;
+  margin-top: 3px;
+}
+
+.breakdown-item.active .breakdown-counts {
+  color: var(--primary);
+  opacity: 0.85;
 }
 
 /* Items Grid & Cards (Scannable Cards con soporte para fotos) */

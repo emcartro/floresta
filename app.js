@@ -555,6 +555,7 @@ function updateCategoryDropdownInItemModal() {
 
 function renderSectionTabs() {
   const container = document.getElementById('sections-tabs');
+  if (!container) return;
   container.innerHTML = '';
 
   // Tab para 'Todas'
@@ -640,20 +641,46 @@ function renderMetrics() {
 
 function renderBreakdownCard() {
   const grid = document.getElementById('breakdown-grid');
+  if (!grid) return;
   grid.innerHTML = '';
 
-  state.sections.forEach((sec) => {
+  // 1. Tarjeta 'Todas las Habitaciones'
+  const allCard = document.createElement('div');
+  const isAllActive = state.selectedSection === 'ALL';
+  allCard.className = `breakdown-item ${isAllActive ? 'active' : ''}`;
+  allCard.innerHTML = `
+    <span class="breakdown-name">🏠 Todas</span>
+    <span class="breakdown-counts">${state.items.length} artículo${state.items.length === 1 ? '' : 's'}</span>
+  `;
+  allCard.addEventListener('click', () => {
+    state.selectedSection = 'ALL';
+    renderInventoryView();
+  });
+  grid.appendChild(allCard);
+
+  // 2. Solo las habitaciones que tienen productos registrados
+  const sectionsWithProducts = state.sections.filter((sec) => {
+    return state.items.some((i) => i.seccion === sec.nombre);
+  });
+
+  // Si la sección seleccionada ya no tiene productos, volver a ALL
+  if (state.selectedSection !== 'ALL' && !sectionsWithProducts.some(s => s.nombre === state.selectedSection)) {
+    state.selectedSection = 'ALL';
+  }
+
+  sectionsWithProducts.forEach((sec) => {
     const secItems = state.items.filter((i) => i.seccion === sec.nombre);
     const total = secItems.length;
+    const isSecActive = state.selectedSection === sec.nombre;
     const itemCard = document.createElement('div');
-    itemCard.className = 'breakdown-item';
+    itemCard.className = `breakdown-item ${isSecActive ? 'active' : ''}`;
     itemCard.innerHTML = `
       <span class="breakdown-name">${escapeHTML(sec.icono || '📦')} ${escapeHTML(sec.nombre)}</span>
       <span class="breakdown-counts">${total} artículo${total === 1 ? '' : 's'}</span>
     `;
     itemCard.addEventListener('click', () => {
-      state.selectedSection = sec.nombre;
-      document.getElementById('room-breakdown-card').classList.add('hidden');
+      // Si ya está seleccionada, toggle de vuelta a ALL; de lo contrario, seleccionarla
+      state.selectedSection = (state.selectedSection === sec.nombre) ? 'ALL' : sec.nombre;
       renderInventoryView();
     });
     grid.appendChild(itemCard);
@@ -2088,14 +2115,53 @@ function setupEventListeners() {
     renderItemsList();
   });
 
-  // Toggle desglose de habitaciones
+  // Toggle panel de Filtros
   const breakdownCard = document.getElementById('room-breakdown-card');
-  document.getElementById('btn-toggle-stats').addEventListener('click', () => {
-    breakdownCard.classList.toggle('hidden');
-  });
-  document.getElementById('btn-close-breakdown').addEventListener('click', () => {
-    breakdownCard.classList.add('hidden');
-  });
+  const btnToggleStats = document.getElementById('btn-toggle-stats');
+  const btnCloseBreakdown = document.getElementById('btn-close-breakdown');
+  const btnResetFilters = document.getElementById('btn-reset-filters');
+
+  if (btnToggleStats && breakdownCard) {
+    btnToggleStats.addEventListener('click', () => {
+      const isHidden = breakdownCard.classList.contains('hidden');
+      if (isHidden) {
+        breakdownCard.classList.remove('hidden');
+        btnToggleStats.classList.add('active');
+        btnToggleStats.setAttribute('aria-expanded', 'true');
+      } else {
+        breakdownCard.classList.add('hidden');
+        btnToggleStats.classList.remove('active');
+        btnToggleStats.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  if (btnCloseBreakdown && breakdownCard) {
+    btnCloseBreakdown.addEventListener('click', () => {
+      breakdownCard.classList.add('hidden');
+      if (btnToggleStats) {
+        btnToggleStats.classList.remove('active');
+        btnToggleStats.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  if (btnResetFilters) {
+    btnResetFilters.addEventListener('click', () => {
+      state.selectedSection = 'ALL';
+      state.selectedTag = 'ALL';
+      state.selectedCategory = 'ALL';
+      const catSelect = document.getElementById('filter-categoria');
+      if (catSelect) catSelect.value = 'ALL';
+      const tagPills = document.querySelectorAll('.tag-pill');
+      tagPills.forEach(p => {
+        if (p.dataset.tag === 'ALL') p.classList.add('active');
+        else p.classList.remove('active');
+      });
+      renderInventoryView();
+      showToast('Filtros restablecidos', 'info');
+    });
+  }
 
   // Exportar CSV
   document.getElementById('btn-export-csv').addEventListener('click', exportInventoryToCSV);
