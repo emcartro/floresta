@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <!-- Offline status alert -->
@@ -129,19 +129,7 @@
           </div>
           <div class="metric-data">
             <span class="metric-value" id="metric-guardar-items">0</span>
-            <span class="metric-label">A Guardar</span>
-          </div>
-        </div>
-
-        <div class="metric-card metric-donar">
-          <div class="metric-icon donar-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-            </svg>
-          </div>
-          <div class="metric-data">
-            <span class="metric-value" id="metric-donar-items">0</span>
-            <span class="metric-label">A Donar</span>
+            <span class="metric-label">A Almacenar</span>
           </div>
         </div>
 
@@ -156,6 +144,18 @@
           <div class="metric-data">
             <span class="metric-value" id="metric-llevar-items">0</span>
             <span class="metric-label">A Llevar</span>
+          </div>
+        </div>
+
+        <div class="metric-card metric-donar">
+          <div class="metric-icon donar-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </div>
+          <div class="metric-data">
+            <span class="metric-value" id="metric-donar-items">0</span>
+            <span class="metric-label">A Donar</span>
           </div>
         </div>
 
@@ -193,9 +193,9 @@
             <span>Todas</span>
             <span class="pill-count" id="pill-count-all">0</span>
           </button>
-          <button class="tag-pill tag-guardar-pill" data-tag="Guardar">
+          <button class="tag-pill tag-guardar-pill" data-tag="Almacenar">
             <span class="dot dot-guardar"></span>
-            <span>Guardar</span>
+            <span>Almacenar</span>
             <span class="pill-count" id="pill-count-guardar">0</span>
           </button>
           <button class="tag-pill tag-llevar-pill" data-tag="Llevar">
@@ -585,7 +585,7 @@
           </label>
           <div class="destination-selector" role="radiogroup" aria-label="Destino del ítem">
             <label class="dest-option dest-guardar">
-              <input type="radio" name="etiqueta_destino" value="Guardar" checked>
+              <input type="radio" name="etiqueta_destino" value="Almacenar" checked>
               <div class="dest-content">
                 <div class="dest-indicator">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -593,7 +593,7 @@
                   </svg>
                 </div>
                 <div class="dest-texts">
-                  <span class="dest-title">Guardar</span>
+                  <span class="dest-title">Almacenar</span>
                   <span class="dest-desc">Conservar en el hogar</span>
                 </div>
               </div>
@@ -919,6 +919,6 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

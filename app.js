@@ -439,7 +439,7 @@ function renderSectionTabs() {
 function renderMetrics() {
   const totalItems = state.items.length;
   const totalPiezas = state.items.reduce((acc, curr) => acc + (Number(curr.cantidad) || 1), 0);
-  const guardar = state.items.filter((i) => i.etiqueta_destino === 'Guardar').length;
+  const almacenar = state.items.filter((i) => i.etiqueta_destino === 'Almacenar' || i.etiqueta_destino === 'Guardar').length;
   const llevar = state.items.filter((i) => i.etiqueta_destino === 'Llevar').length;
   const donar = state.items.filter((i) => i.etiqueta_destino === 'Donar').length;
   const venderItems = state.items.filter((i) => i.etiqueta_destino === 'Vender');
@@ -453,7 +453,7 @@ function renderMetrics() {
   // Muestra total ítems (y piezas si son más de 1 por ítem)
   const totalLabel = totalPiezas !== totalItems ? `${totalItems} (${totalPiezas} pzs)` : `${totalItems}`;
   document.getElementById('metric-total-items').textContent = totalLabel;
-  document.getElementById('metric-guardar-items').textContent = guardar;
+  document.getElementById('metric-guardar-items').textContent = almacenar;
   const metricLlevarEl = document.getElementById('metric-llevar-items');
   if (metricLlevarEl) metricLlevarEl.textContent = llevar;
   document.getElementById('metric-donar-items').textContent = donar;
@@ -461,7 +461,7 @@ function renderMetrics() {
   document.getElementById('metric-vender-total').textContent = formatMoney(totalVentaEstimada);
 
   document.getElementById('pill-count-all').textContent = totalItems;
-  document.getElementById('pill-count-guardar').textContent = guardar;
+  document.getElementById('pill-count-guardar').textContent = almacenar;
   const pillLlevarEl = document.getElementById('pill-count-llevar');
   if (pillLlevarEl) pillLlevarEl.textContent = llevar;
   document.getElementById('pill-count-donar').textContent = donar;
@@ -503,7 +503,12 @@ function getFilteredAndSortedItems() {
   }
 
   if (state.selectedTag !== 'ALL') {
-    list = list.filter((item) => item.etiqueta_destino === state.selectedTag);
+    list = list.filter((item) => {
+      if (state.selectedTag === 'Almacenar') {
+        return item.etiqueta_destino === 'Almacenar' || item.etiqueta_destino === 'Guardar';
+      }
+      return item.etiqueta_destino === state.selectedTag;
+    });
   }
 
   if (state.selectedCategory !== 'ALL') {
@@ -590,13 +595,13 @@ function renderItemsList() {
     // Destino y precio (incorporando cantidad en venta)
     const cantidad = Number(item.cantidad) || 1;
     let badgeHtml = '';
-    if (item.etiqueta_destino === 'Guardar') {
+    if (item.etiqueta_destino === 'Almacenar' || item.etiqueta_destino === 'Guardar') {
       badgeHtml = `
         <span class="item-badge-destination badge-guardar">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
             <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
           </svg>
-          Guardar
+          Almacenar
         </span>
       `;
     } else if (item.etiqueta_destino === 'Llevar') {
@@ -1076,8 +1081,8 @@ function openModalForAdd() {
     document.getElementById('form-categoria').value = state.selectedCategory;
   }
 
-  const guardarRadio = document.querySelector('input[name="etiqueta_destino"][value="Guardar"]');
-  if (guardarRadio) guardarRadio.checked = true;
+  const almacenarRadio = document.querySelector('input[name="etiqueta_destino"][value="Almacenar"]');
+  if (almacenarRadio) almacenarRadio.checked = true;
 
   handleDestinationChange();
   renderPhotoPreviews();
@@ -1106,7 +1111,9 @@ function openModalForEdit(id) {
   document.getElementById('form-estado').value = item.estado;
   document.getElementById('form-notas').value = item.notas || '';
 
-  const targetRadio = document.querySelector(`input[name="etiqueta_destino"][value="${item.etiqueta_destino}"]`);
+  // Normalizar Guardar a Almacenar en la selección del radio si viene de datos antiguos
+  const targetVal = item.etiqueta_destino === 'Guardar' ? 'Almacenar' : item.etiqueta_destino;
+  const targetRadio = document.querySelector(`input[name="etiqueta_destino"][value="${targetVal}"]`);
   if (targetRadio) targetRadio.checked = true;
 
   handleDestinationChange();
@@ -1193,23 +1200,53 @@ function openItemViewModal(itemId) {
     `;
   }
 
-  // Galería de fotos o placeholder
+  // Carrusel de fotos interactivo o placeholder
   const hasPhotos = Array.isArray(item.fotos) && item.fotos.length > 0;
   let photosHtml = '';
   if (hasPhotos) {
+    const photos = item.fotos;
+    const isMultiple = photos.length > 1;
+
     photosHtml = `
-      <div>
+      <div class="view-carousel-wrapper">
         <div class="view-photos-header">
-          <span>📸 Fotos Registradas (${item.fotos.length})</span>
-          <span style="font-size: 0.72rem; color: var(--text-tertiary);">Clic para ampliar</span>
+          <span>📸 Fotos del Artículo (${photos.length})</span>
+          <span style="font-size: 0.72rem; color: var(--text-tertiary);">Clic en la foto para pantalla completa</span>
         </div>
-        <div class="view-photos-gallery" style="margin-top: 8px;">
-          ${item.fotos.map((url, idx) => `
-            <div class="view-photo-thumb" data-photo-idx="${idx}">
-              <img src="${url}" alt="Foto ${idx + 1}" loading="lazy">
-            </div>
-          `).join('')}
+
+        <div class="view-carousel-container" id="detail-carousel-container">
+          <img 
+            src="${photos[0]}" 
+            alt="${escapeHTML(item.nombre)}" 
+            class="view-carousel-img" 
+            id="detail-carousel-img"
+            loading="lazy"
+          >
+          <div class="view-carousel-badge" id="detail-carousel-badge">
+            1 / ${photos.length}
+          </div>
+
+          ${isMultiple ? `
+            <button type="button" class="view-carousel-btn view-carousel-prev" id="btn-detail-carousel-prev" aria-label="Foto anterior">‹</button>
+            <button type="button" class="view-carousel-btn view-carousel-next" id="btn-detail-carousel-next" aria-label="Siguiente foto">›</button>
+          ` : ''}
         </div>
+
+        ${isMultiple ? `
+          <div class="view-carousel-dots" id="detail-carousel-dots">
+            ${photos.map((_, idx) => `
+              <button type="button" class="view-carousel-dot ${idx === 0 ? 'active' : ''}" data-idx="${idx}" aria-label="Ir a foto ${idx + 1}"></button>
+            `).join('')}
+          </div>
+
+          <div class="view-carousel-thumbs" id="detail-carousel-thumbs">
+            ${photos.map((url, idx) => `
+              <div class="view-carousel-thumb ${idx === 0 ? 'active' : ''}" data-idx="${idx}">
+                <img src="${url}" alt="Miniatura ${idx + 1}" loading="lazy">
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
       </div>
     `;
   } else {
@@ -1223,6 +1260,8 @@ function openItemViewModal(itemId) {
 
   viewItemContent.innerHTML = `
     <h2 class="view-modal-title" id="view-item-title">${escapeHTML(item.nombre)}</h2>
+
+    ${photosHtml}
 
     <div class="view-info-grid">
       <div class="view-info-item">
@@ -1252,19 +1291,69 @@ function openItemViewModal(itemId) {
         </div>
       </div>
     ` : ''}
-
-    ${photosHtml}
   `;
 
-  // Asignar clics a miniaturas de fotos para Lightbox
+  // Inicializar controles interactivos del carrusel
   if (hasPhotos) {
-    const thumbs = viewItemContent.querySelectorAll('.view-photo-thumb');
-    thumbs.forEach(thumb => {
-      thumb.addEventListener('click', () => {
-        const idx = parseInt(thumb.dataset.photoIdx, 10) || 0;
-        openLightbox(item.fotos, idx, item.nombre);
+    const photos = item.fotos;
+    let currentPhotoIdx = 0;
+
+    const imgEl = viewItemContent.querySelector('#detail-carousel-img');
+    const badgeEl = viewItemContent.querySelector('#detail-carousel-badge');
+    const prevBtn = viewItemContent.querySelector('#btn-detail-carousel-prev');
+    const nextBtn = viewItemContent.querySelector('#btn-detail-carousel-next');
+    const dots = viewItemContent.querySelectorAll('.view-carousel-dot');
+    const thumbs = viewItemContent.querySelectorAll('.view-carousel-thumb');
+
+    const updateCarousel = (newIdx) => {
+      currentPhotoIdx = (newIdx + photos.length) % photos.length;
+      imgEl.src = photos[currentPhotoIdx];
+      if (badgeEl) badgeEl.textContent = `${currentPhotoIdx + 1} / ${photos.length}`;
+
+      dots.forEach((dot, idx) => {
+        dot.classList.toggle('active', idx === currentPhotoIdx);
+      });
+      thumbs.forEach((th, idx) => {
+        th.classList.toggle('active', idx === currentPhotoIdx);
+      });
+    };
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        updateCarousel(currentPhotoIdx - 1);
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        updateCarousel(currentPhotoIdx + 1);
+      });
+    }
+
+    dots.forEach((dot) => {
+      dot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(dot.dataset.idx, 10) || 0;
+        updateCarousel(idx);
       });
     });
+
+    thumbs.forEach((th) => {
+      th.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(th.dataset.idx, 10) || 0;
+        updateCarousel(idx);
+      });
+    });
+
+    // Clic en la imagen del carrusel abre el Lightbox en pantalla completa
+    if (imgEl) {
+      imgEl.addEventListener('click', () => {
+        openLightbox(photos, currentPhotoIdx, item.nombre);
+      });
+    }
   }
 
   itemViewModalOverlay.classList.remove('hidden');
@@ -1313,7 +1402,7 @@ itemForm.addEventListener('submit', async (e) => {
   const categoriaVal = document.getElementById('form-categoria').value || 'Mobiliario';
   const cantidadVal = Math.max(1, parseInt(document.getElementById('form-cantidad').value, 10) || 1);
   const estadoVal = document.getElementById('form-estado').value;
-  const etiquetaVal = document.querySelector('input[name="etiqueta_destino"]:checked')?.value || 'Guardar';
+  const etiquetaVal = document.querySelector('input[name="etiqueta_destino"]:checked')?.value || 'Almacenar';
   
   let precioVal = null;
   if (etiquetaVal === 'Vender') {

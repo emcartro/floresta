@@ -1,4 +1,4 @@
-const CACHE_NAME = 'inventario-hogar-v3';
+const CACHE_NAME = 'inventario-hogar-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
