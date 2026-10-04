@@ -27,15 +27,18 @@ ENV NODE_ENV=production \
     UPLOADS_DIR=/app/data/uploads \
     DB_PATH=/app/data/inventario.sqlite
 
+# Instalar curl para healthcheck robusto en Alpine
+RUN apk add --no-cache curl
+
 # Declarar volumen persistente para SQLite y fotos en Coolify
 VOLUME ["/app/data"]
 
 # Puerto expuesto
 EXPOSE 3000
 
-# Verificación de salud del contenedor (Healthcheck)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+# Verificación de salud del contenedor (Healthcheck) usando IPv4 127.0.0.1
+HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -f -s http://127.0.0.1:3000/health || exit 1
 
 # Comando de inicio
 CMD ["node", "server.js"]
