@@ -21,13 +21,42 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 // Inicializar conexión SQLite
-const db = new DatabaseSync(DB_PATH);
+let db = new DatabaseSync(DB_PATH);
 
 // Configuración pragmas recomendados para SQLite (WAL mode, foreign keys, UTF-8)
-db.exec(`
-  PRAGMA journal_mode = WAL;
-  PRAGMA foreign_keys = ON;
-`);
+function applyPragmas() {
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA foreign_keys = ON;
+  `);
+}
+applyPragmas();
+
+// Forzar guardado de todas las transacciones WAL en el archivo principal .sqlite
+function flushAndCheckpoint() {
+  try {
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+  } catch (err) {
+    console.warn('Advertencia en wal_checkpoint:', err);
+  }
+}
+
+// Cerrar conexión de forma segura para permitir reemplazo de archivo en restauraciones
+function closeDatabase() {
+  try {
+    flushAndCheckpoint();
+    db.close();
+  } catch (err) {
+    console.warn('Error al cerrar DB:', err);
+  }
+}
+
+// Reabrir conexión SQLite tras una restauración
+function reopenDatabase() {
+  db = new DatabaseSync(DB_PATH);
+  applyPragmas();
+  return db;
+}
 
 // Crear tablas si no existen
 db.exec(`
@@ -289,10 +318,13 @@ const ItemRepo = {
 };
 
 module.exports = {
-  db,
+  getDb: () => db,
   DATA_DIR,
   UPLOADS_DIR,
   DB_PATH,
+  flushAndCheckpoint,
+  closeDatabase,
+  reopenDatabase,
   SectionRepo,
   ItemRepo
 };

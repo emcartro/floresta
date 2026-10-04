@@ -48,6 +48,15 @@
         </div>
 
         <div class="header-actions">
+          <button id="btn-open-backup" class="btn btn-secondary btn-icon" title="Copia de Seguridad y Restauración (ZIP)" aria-label="Copia de Seguridad">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+            <span class="btn-text-desktop">Respaldo ZIP</span>
+          </button>
+
           <button id="btn-export-csv" class="btn btn-secondary btn-icon" title="Exportar a Excel / CSV" aria-label="Exportar CSV">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
@@ -619,6 +628,103 @@
           <span id="lightbox-index-badge">1 / 1</span>
           <button id="btn-lightbox-next" class="btn-icon-lightbox">›</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Drawer: Copia de Seguridad y Restauración (ZIP) -->
+  <div id="backup-modal-overlay" class="modal-overlay hidden" aria-hidden="true">
+    <div class="modal-drawer" role="dialog" aria-modal="true" aria-labelledby="backup-modal-title">
+      <div class="drawer-handle" aria-hidden="true"></div>
+
+      <header class="modal-header">
+        <div>
+          <h2 id="backup-modal-title" class="modal-title">Copia de Seguridad y Restauración</h2>
+          <p class="modal-subtitle">Respaldo total de base de datos SQLite y fotos en archivo ZIP</p>
+        </div>
+        <button id="btn-close-backup-modal" class="btn-icon-subtle" aria-label="Cerrar ventana">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </header>
+
+      <div class="backup-modal-body">
+        <!-- Opción 1: Exportar Respaldo -->
+        <section class="backup-card backup-card-export">
+          <div class="backup-card-icon export-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+          </div>
+          <div class="backup-card-info">
+            <h3 class="backup-card-title">Descargar Copia Completa (ZIP)</h3>
+            <p class="backup-card-desc">
+              Empaqueta la base de datos SQL (`inventario.sqlite`), todas las fotos de tus artículos y metadatos en un solo archivo comprimido.
+            </p>
+            <button id="btn-download-backup-zip" class="btn btn-primary btn-backup-action">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+              </svg>
+              <span>Generar y Descargar ZIP</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Opción 2: Restaurar Respaldo -->
+        <section class="backup-card backup-card-restore">
+          <div class="backup-card-icon restore-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+          </div>
+          <div class="backup-card-info">
+            <h3 class="backup-card-title">Restaurar desde Respaldo (ZIP)</h3>
+            <p class="backup-card-desc">
+              Restaura tu inventario seleccionando un archivo `.zip` previamente exportado.
+            </p>
+
+            <div class="backup-dropzone" id="backup-dropzone">
+              <input type="file" id="backup-zip-input" accept=".zip,application/zip" class="hidden-file-input">
+              <div class="backup-dropzone-content" id="btn-trigger-backup-file">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242M12 12v9m-4-4 4-4 4 4"/>
+                </svg>
+                <span id="backup-selected-file-name">Haz clic para seleccionar archivo .zip</span>
+              </div>
+            </div>
+
+            <button id="btn-submit-restore" class="btn btn-secondary btn-backup-action hidden" style="margin-top: 10px;">
+              <span>Subir y Restaurar</span>
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmación de Restauración -->
+  <div id="restore-confirm-modal" class="modal-overlay hidden" aria-hidden="true">
+    <div class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="restore-confirm-title">
+      <div class="delete-icon-wrapper" style="background: #fffbeb;">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#d97706" stroke-width="2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <h3 id="restore-confirm-title" class="confirm-title">¿Restaurar esta Copia de Seguridad?</h3>
+      <p class="confirm-desc">
+        Se reemplazarán los artículos, secciones y fotos actuales por el contenido del archivo <strong id="restore-file-label">backup.zip</strong>.
+        <br><br>
+        <span style="font-size: 0.8rem; color: #64748b;">(El sistema creará una copia de reversión automática antes de aplicar los cambios).</span>
+      </p>
+      <div class="confirm-actions">
+        <button id="btn-cancel-restore" class="btn btn-secondary flex-1">Cancelar</button>
+        <button id="btn-confirm-restore" class="btn btn-primary flex-1" style="background:#d97706;">Confirmar Restauración</button>
       </div>
     </div>
   </div>

@@ -8,6 +8,8 @@
     "generate-icons": "node generate-icons.js"
   },
   "dependencies": {
+    "adm-zip": "^0.6.1",
+    "archiver": "^8.0.0",
     "express": "^4.21.2",
     "multer": "^1.4.5-lts.1"
   },

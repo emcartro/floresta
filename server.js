@@ -7,7 +7,18 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
-const { SectionRepo, ItemRepo, UPLOADS_DIR, DATA_DIR } = require('./db');
+const archiver = require('archiver');
+const AdmZip = require('adm-zip');
+const { 
+  SectionRepo, 
+  ItemRepo, 
+  UPLOADS_DIR, 
+  DATA_DIR, 
+  DB_PATH, 
+  flushAndCheckpoint, 
+  closeDatabase, 
+  reopenDatabase 
+} = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -307,6 +318,137 @@ app.get('/api/export', (req, res) => {
   } catch (error) {
     console.error('Error al exportar CSV:', error);
     res.status(500).send('Error generando CSV');
+  }
+});
+
+// =============================================================================
+// API REST - COPIA DE SEGURIDAD Y RESTAURACIÓN (ZIP CON SQLITE Y FOTOS)
+// =============================================================================
+
+// Exportar copia de seguridad completa en ZIP
+app.get('/api/backup/export', (req, res) => {
+  try {
+    flushAndCheckpoint();
+
+    const sections = SectionRepo.getAll();
+    const items = ItemRepo.getAll();
+
+    const backupInfo = {
+      appName: 'Inventario para el Hogar',
+      version: '1.0',
+      createdAt: new Date().toISOString(),
+      sectionsCount: sections.length,
+      itemsCount: items.length
+    };
+
+    const dateStr = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const zipFilename = `backup_inventario_${dateStr}.zip`;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    archive.on('error', (err) => {
+      console.error('Error generando backup ZIP:', err);
+      if (!res.headersSent) res.status(500).send('Error creando respaldo ZIP');
+    });
+
+    archive.pipe(res);
+
+    // 1. Metadatos del respaldo
+    archive.append(JSON.stringify(backupInfo, null, 2), { name: 'backup_info.json' });
+
+    // 2. Base de datos SQLite completa
+    if (fs.existsSync(DB_PATH)) {
+      archive.file(DB_PATH, { name: 'inventario.sqlite' });
+    }
+
+    // 3. Carpeta de fotos completas
+    if (fs.existsSync(UPLOADS_DIR)) {
+      archive.directory(UPLOADS_DIR, 'uploads');
+    }
+
+    archive.finalize();
+  } catch (error) {
+    console.error('Error al exportar backup ZIP:', error);
+    if (!res.headersSent) res.status(500).json({ error: 'Error al exportar copia de seguridad' });
+  }
+});
+
+// Directorio temporal para procesar subidas de backup
+const TEMP_DIR = path.join(DATA_DIR, 'temp');
+if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
+
+const zipUpload = multer({
+  dest: TEMP_DIR,
+  limits: { fileSize: 250 * 1024 * 1024 } // 250 MB máximo
+});
+
+// Restaurar copia de seguridad desde archivo ZIP
+app.post('/api/backup/restore', zipUpload.single('backup_zip'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se envió ningún archivo de respaldo (.zip)' });
+    }
+
+    const zipFilePath = req.file.path;
+    const zip = new AdmZip(zipFilePath);
+    const zipEntries = zip.getEntries();
+
+    // Validar que el archivo ZIP contenga la base de datos
+    const dbEntry = zipEntries.find(e => e.entryName === 'inventario.sqlite' || e.entryName.endsWith('/inventario.sqlite'));
+    if (!dbEntry) {
+      if (fs.existsSync(zipFilePath)) fs.unlinkSync(zipFilePath);
+      return res.status(400).json({ error: 'El archivo ZIP no contiene una base de datos válida (inventario.sqlite).' });
+    }
+
+    // 1. Crear copia de respaldo de reversión (Rollback pre-restore)
+    if (fs.existsSync(DB_PATH)) {
+      flushAndCheckpoint();
+      const rollbackFile = path.join(DATA_DIR, `inventario_pre_restore_${Date.now()}.sqlite`);
+      fs.copyFileSync(DB_PATH, rollbackFile);
+    }
+
+    // 2. Cerrar la conexión SQLite activa
+    closeDatabase();
+
+    // 3. Extraer y sobreescribir inventario.sqlite
+    fs.writeFileSync(DB_PATH, dbEntry.getData());
+
+    // 4. Extraer fotos contenidas en uploads/
+    zipEntries.forEach(entry => {
+      if ((entry.entryName.startsWith('uploads/') || entry.entryName.includes('/uploads/')) && !entry.isDirectory) {
+        const filename = path.basename(entry.entryName);
+        if (filename) {
+          const targetPath = path.join(UPLOADS_DIR, filename);
+          fs.writeFileSync(targetPath, entry.getData());
+        }
+      }
+    });
+
+    // 5. Reabrir conexión SQLite y aplicar pragmas
+    reopenDatabase();
+
+    // Limpiar archivo ZIP temporal
+    if (fs.existsSync(zipFilePath)) fs.unlinkSync(zipFilePath);
+
+    const sections = SectionRepo.getAll();
+    const items = ItemRepo.getAll();
+
+    res.json({
+      success: true,
+      message: 'Copia de seguridad restaurada correctamente',
+      sectionsCount: sections.length,
+      itemsCount: items.length
+    });
+  } catch (error) {
+    console.error('Error restaurando backup ZIP:', error);
+    try { reopenDatabase(); } catch (e) {}
+    if (req.file && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+    }
+    res.status(500).json({ error: 'Error al restaurar la copia de seguridad: ' + error.message });
   }
 });
 

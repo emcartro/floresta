@@ -1848,3 +1848,102 @@ body {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ==========================================================================
+   ESTILOS DE COPIA DE SEGURIDAD Y RESTAURACIÓN (ZIP)
+   ========================================================================== */
+.backup-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.backup-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition);
+}
+
+.backup-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.backup-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.export-icon {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.restore-icon {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.backup-card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.backup-card-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.backup-card-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.btn-backup-action {
+  align-self: flex-start;
+  margin-top: 6px;
+  font-size: 0.84rem;
+}
+
+.backup-dropzone {
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-top: 6px;
+  text-align: center;
+  background: var(--bg-subtle);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.backup-dropzone:hover {
+  border-color: #d97706;
+  background: #fffdf5;
+}
+
+.backup-dropzone-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}

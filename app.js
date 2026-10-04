@@ -1270,6 +1270,101 @@ function setupEventListeners() {
   // Exportar CSV
   document.getElementById('btn-export-csv').addEventListener('click', exportInventoryToCSV);
 
+  // Modal de Copia de Seguridad y Restauración (ZIP)
+  const backupModal = document.getElementById('backup-modal-overlay');
+  const restoreConfirmModal = document.getElementById('restore-confirm-modal');
+  const backupZipInput = document.getElementById('backup-zip-input');
+  const backupSelectedFileName = document.getElementById('backup-selected-file-name');
+  const btnSubmitRestore = document.getElementById('btn-submit-restore');
+
+  document.getElementById('btn-open-backup').addEventListener('click', () => {
+    backupModal.classList.remove('hidden');
+    backupZipInput.value = '';
+    backupSelectedFileName.textContent = 'Haz clic para seleccionar archivo .zip';
+    btnSubmitRestore.classList.add('hidden');
+  });
+
+  document.getElementById('btn-close-backup-modal').addEventListener('click', () => {
+    backupModal.classList.add('hidden');
+  });
+
+  backupModal.addEventListener('click', (e) => {
+    if (e.target === backupModal) backupModal.classList.add('hidden');
+  });
+
+  // Descarga de copia de seguridad ZIP
+  document.getElementById('btn-download-backup-zip').addEventListener('click', () => {
+    showToast('Generando y descargando respaldo ZIP con fotos...', 'info');
+    window.location.href = '/api/backup/export';
+  });
+
+  // Selección de archivo ZIP para restaurar
+  document.getElementById('btn-trigger-backup-file').addEventListener('click', () => {
+    backupZipInput.click();
+  });
+
+  let selectedBackupFile = null;
+
+  backupZipInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      selectedBackupFile = e.target.files[0];
+      const sizeMb = (selectedBackupFile.size / (1024 * 1024)).toFixed(2);
+      backupSelectedFileName.textContent = `📦 ${selectedBackupFile.name} (${sizeMb} MB)`;
+      btnSubmitRestore.classList.remove('hidden');
+    }
+  });
+
+  btnSubmitRestore.addEventListener('click', () => {
+    if (!selectedBackupFile) return;
+    document.getElementById('restore-file-label').textContent = selectedBackupFile.name;
+    restoreConfirmModal.classList.remove('hidden');
+  });
+
+  document.getElementById('btn-cancel-restore').addEventListener('click', () => {
+    restoreConfirmModal.classList.add('hidden');
+  });
+
+  restoreConfirmModal.addEventListener('click', (e) => {
+    if (e.target === restoreConfirmModal) restoreConfirmModal.classList.add('hidden');
+  });
+
+  document.getElementById('btn-confirm-restore').addEventListener('click', async () => {
+    if (!selectedBackupFile) return;
+    restoreConfirmModal.classList.add('hidden');
+
+    showToast('Restaurando inventario y fotos en SQL...', 'info');
+
+    try {
+      const formData = new FormData();
+      formData.append('backup_zip', selectedBackupFile);
+
+      const res = await fetch('/api/backup/restore', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Error restaurando respaldo');
+      }
+
+      showToast(`¡Respaldo restaurado con éxito! (${data.itemsCount} artículos, ${data.sectionsCount} secciones)`);
+      backupModal.classList.add('hidden');
+
+      // Recargar datos desde la base de datos restaurada
+      const [sections, items] = await Promise.all([
+        api.getSections(),
+        api.getItems()
+      ]);
+      state.sections = sections || [];
+      state.items = items || [];
+      renderInventoryView();
+      renderSectionsManageView();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
   // Detección de conectividad online/offline
   const offlineBadge = document.getElementById('offline-badge');
   function updateOnlineStatus() {
