@@ -354,7 +354,11 @@ const SessionRepo = {
 const CasaRepo = {
   getAll() {
     const query = db.prepare(`
-      SELECT c.*, COUNT(i.id) as item_count
+      SELECT 
+        c.*, 
+        COUNT(DISTINCT i.id) as item_count,
+        COUNT(DISTINCT i.seccion) as section_count,
+        COALESCE(SUM(CASE WHEN i.etiqueta_destino = 'Vender' THEN COALESCE(i.precio_venta, 0) * COALESCE(i.cantidad, 1) ELSE 0 END), 0) as total_valor_venta
       FROM casas c
       LEFT JOIN items i ON c.id = i.casa_id
       GROUP BY c.id
@@ -365,7 +369,11 @@ const CasaRepo = {
 
   getById(id) {
     const row = db.prepare(`
-      SELECT c.*, COUNT(i.id) as item_count
+      SELECT 
+        c.*, 
+        COUNT(DISTINCT i.id) as item_count,
+        COUNT(DISTINCT i.seccion) as section_count,
+        COALESCE(SUM(CASE WHEN i.etiqueta_destino = 'Vender' THEN COALESCE(i.precio_venta, 0) * COALESCE(i.cantidad, 1) ELSE 0 END), 0) as total_valor_venta
       FROM casas c
       LEFT JOIN items i ON c.id = i.casa_id
       WHERE c.id = ?

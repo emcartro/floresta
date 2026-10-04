@@ -206,6 +206,31 @@ const api = {
     return data;
   },
 
+  async updateCasa(id, casaData) {
+    const res = await fetch(`/api/casas/${id}`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(casaData)
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Error al actualizar propiedad');
+    }
+    return data;
+  },
+
+  async deleteCasa(id) {
+    const res = await fetch(`/api/casas/${id}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Error al eliminar propiedad');
+    }
+    return data;
+  },
+
   async getCategories() {
     try {
       const res = await fetch('/api/categories', {
@@ -433,27 +458,39 @@ function switchView(viewName) {
   state.currentView = viewName;
   const invTab = document.getElementById('nav-tab-inventory');
   const secTab = document.getElementById('nav-tab-sections');
+  const casasTab = document.getElementById('nav-tab-casas');
   const invView = document.getElementById('view-inventory');
   const secView = document.getElementById('view-sections');
+  const casasView = document.getElementById('view-casas');
+
+  // Quitar active de todas las pestañas
+  invTab?.classList.remove('active');
+  invTab?.setAttribute('aria-selected', 'false');
+  secTab?.classList.remove('active');
+  secTab?.setAttribute('aria-selected', 'false');
+  casasTab?.classList.remove('active');
+  casasTab?.setAttribute('aria-selected', 'false');
+
+  // Ocultar todas las vistas
+  invView?.classList.add('hidden');
+  secView?.classList.add('hidden');
+  casasView?.classList.add('hidden');
 
   if (viewName === 'inventory') {
-    invTab.classList.add('active');
-    invTab.setAttribute('aria-selected', 'true');
-    secTab.classList.remove('active');
-    secTab.setAttribute('aria-selected', 'false');
-
-    invView.classList.remove('hidden');
-    secView.classList.add('hidden');
+    invTab?.classList.add('active');
+    invTab?.setAttribute('aria-selected', 'true');
+    invView?.classList.remove('hidden');
     renderInventoryView();
-  } else {
-    secTab.classList.add('active');
-    secTab.setAttribute('aria-selected', 'true');
-    invTab.classList.remove('active');
-    invTab.setAttribute('aria-selected', 'false');
-
-    secView.classList.remove('hidden');
-    invView.classList.add('hidden');
+  } else if (viewName === 'sections') {
+    secTab?.classList.add('active');
+    secTab?.setAttribute('aria-selected', 'true');
+    secView?.classList.remove('hidden');
     renderSectionsManageView();
+  } else if (viewName === 'casas') {
+    casasTab?.classList.add('active');
+    casasTab?.setAttribute('aria-selected', 'true');
+    casasView?.classList.remove('hidden');
+    renderCasasManageView();
   }
 }
 
@@ -1055,6 +1092,174 @@ document.getElementById('section-form').addEventListener('submit', async (e) => 
 
 document.getElementById('btn-cancel-sec-edit').addEventListener('click', resetSectionForm);
 
+// =============================================================================
+// VISTA DE ADMINISTRACIÓN DE CASAS / PROPIEDADES
+// =============================================================================
+
+function renderCasasManageView() {
+  const container = document.getElementById('casas-manage-grid');
+  const countPill = document.getElementById('casas-total-pill');
+  const navCasasBadge = document.getElementById('nav-casas-count');
+
+  if (countPill) {
+    const total = state.casas.length;
+    countPill.textContent = `${total} propiedad${total === 1 ? '' : 'es'}`;
+  }
+  if (navCasasBadge) {
+    navCasasBadge.textContent = state.casas.length;
+  }
+
+  if (!container) return;
+  container.innerHTML = '';
+
+  state.casas.forEach((casa) => {
+    const isActive = casa.id === state.selectedCasaId;
+    const card = document.createElement('div');
+    card.className = `casa-card ${isActive ? 'active-casa-card' : ''}`;
+
+    const itemsCount = Number(casa.item_count) || 0;
+    const sectionsCount = Number(casa.section_count) || 0;
+    const valorVenta = Number(casa.total_valor_venta) || 0;
+
+    card.innerHTML = `
+      <div class="casa-card-header">
+        <div class="casa-card-avatar">${casa.icono || '🏡'}</div>
+        <div class="casa-card-info">
+          <h4 class="casa-card-title">${escapeHTML(casa.nombre)}</h4>
+          ${casa.direccion ? `
+            <div class="casa-card-address">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              <span>${escapeHTML(casa.direccion)}</span>
+            </div>
+          ` : ''}
+          ${casa.descripcion ? `<p class="casa-card-desc">${escapeHTML(casa.descripcion)}</p>` : ''}
+        </div>
+        ${isActive ? '<span class="casa-card-badge-active">🏡 Activa</span>' : ''}
+      </div>
+
+      <div class="casa-card-metrics-grid">
+        <div class="casa-stat-item">
+          <span class="casa-stat-value">${itemsCount}</span>
+          <span class="casa-stat-label">Ítems</span>
+        </div>
+        <div class="casa-stat-item">
+          <span class="casa-stat-value">${sectionsCount}</span>
+          <span class="casa-stat-label">Secciones</span>
+        </div>
+        <div class="casa-stat-item">
+          <span class="casa-stat-value">${formatMoney(valorVenta)}</span>
+          <span class="casa-stat-label">En Venta</span>
+        </div>
+      </div>
+
+      <div class="casa-card-actions">
+        ${isActive ? `
+          <button type="button" class="btn btn-secondary btn-select-casa is-active" disabled>
+            <span>✓ Casa Activa</span>
+          </button>
+        ` : `
+          <button type="button" class="btn btn-primary btn-select-casa btn-switch-casa">
+            <span>Seleccionar Casa</span>
+          </button>
+        `}
+        <button type="button" class="btn btn-secondary btn-icon btn-edit-casa" title="Editar propiedad">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+          </svg>
+          <span style="font-size:0.75rem;">Editar</span>
+        </button>
+        <button type="button" class="btn btn-secondary btn-icon btn-card-delete btn-delete-casa" title="Eliminar propiedad" ${state.casas.length <= 1 ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+          </svg>
+          <span style="font-size:0.75rem;">Eliminar</span>
+        </button>
+      </div>
+    `;
+
+    // Click en Seleccionar Casa
+    const switchBtn = card.querySelector('.btn-switch-casa');
+    if (switchBtn) {
+      switchBtn.addEventListener('click', async () => {
+        state.selectedCasaId = casa.id;
+        localStorage.setItem('inventario_selected_casa', casa.id);
+        showToast(`Cambiando a "${casa.nombre}"...`);
+        await reloadAppData();
+        switchView('inventory');
+      });
+    }
+
+    // Click en Editar Casa
+    const editBtn = card.querySelector('.btn-edit-casa');
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        openPropertyModalForEdit(casa);
+      });
+    }
+
+    // Click en Eliminar Casa
+    const deleteBtn = card.querySelector('.btn-delete-casa');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => {
+        if (state.casas.length <= 1) {
+          showToast('No puedes eliminar la única propiedad existente', 'error');
+          return;
+        }
+        openDeleteDialog('casa', casa.id, casa.nombre, itemsCount);
+      });
+    }
+
+    container.appendChild(card);
+  });
+}
+
+function openPropertyModalForAdd() {
+  if (propertyModalOverlay) {
+    if (propertyForm) propertyForm.reset();
+    document.getElementById('prop-id').value = '';
+    document.getElementById('property-modal-title').textContent = 'Nueva Propiedad / Casa';
+    document.getElementById('btn-submit-prop-modal').textContent = 'Guardar Propiedad';
+    document.getElementById('prop-icono').value = '🏡';
+    
+    if (propEmojiPicker) {
+      propEmojiPicker.querySelectorAll('.btn-emoji').forEach(b => b.classList.remove('active'));
+      const defaultEmoji = propEmojiPicker.querySelector('[data-emoji="🏡"]');
+      if (defaultEmoji) defaultEmoji.classList.add('active');
+    }
+    
+    propertyModalOverlay.classList.remove('hidden');
+    document.getElementById('prop-nombre').focus();
+  }
+}
+
+function openPropertyModalForEdit(casa) {
+  if (propertyModalOverlay) {
+    document.getElementById('prop-id').value = casa.id;
+    document.getElementById('property-modal-title').textContent = `✏️ Editar: "${casa.nombre}"`;
+    document.getElementById('btn-submit-prop-modal').textContent = 'Actualizar Propiedad';
+    document.getElementById('prop-nombre').value = casa.nombre || '';
+    document.getElementById('prop-icono').value = casa.icono || '🏡';
+    document.getElementById('prop-direccion').value = casa.direccion || '';
+    document.getElementById('prop-desc').value = casa.descripcion || '';
+
+    if (propEmojiPicker) {
+      propEmojiPicker.querySelectorAll('.btn-emoji').forEach(b => b.classList.remove('active'));
+      const activeEmojiBtn = propEmojiPicker.querySelector(`[data-emoji="${casa.icono}"]`);
+      if (activeEmojiBtn) {
+        activeEmojiBtn.classList.add('active');
+      }
+    }
+
+    propertyModalOverlay.classList.remove('hidden');
+    document.getElementById('prop-nombre').focus();
+  }
+}
+
 // Selector rápido de emojis para secciones
 document.getElementById('emoji-quick-picker').addEventListener('click', (e) => {
   const btn = e.target.closest('.btn-emoji');
@@ -1619,7 +1824,17 @@ function openDeleteDialog(type, id, name, extraData = null) {
   document.getElementById('delete-item-name').textContent = `"${name}"`;
 
   const descEl = document.getElementById('delete-desc');
-  if (type === 'section') {
+  if (type === 'casa') {
+    if (extraData && extraData > 0) {
+      descEl.innerHTML = `⚠️ La propiedad <strong>"${name}"</strong> contiene <strong>${extraData} artículo(s)</strong> registrados. Para evitar pérdida accidental de datos, primero transfiere o elimina los artículos antes de borrar esta casa.`;
+      document.getElementById('btn-confirm-delete').disabled = true;
+      document.getElementById('btn-confirm-delete').style.opacity = '0.5';
+    } else {
+      descEl.innerHTML = `Estás a punto de eliminar la propiedad <strong>"${name}"</strong>. No contiene artículos y se eliminará permanentemente de tu cuenta.`;
+      document.getElementById('btn-confirm-delete').disabled = false;
+      document.getElementById('btn-confirm-delete').style.opacity = '1';
+    }
+  } else if (type === 'section') {
     if (extraData && extraData > 0) {
       descEl.innerHTML = `⚠️ La sección <strong>"${name}"</strong> contiene <strong>${extraData} artículo(s)</strong>. Para proteger tus datos, primero reasigna o elimina los artículos antes de borrar la sección.`;
       document.getElementById('btn-confirm-delete').disabled = true;
@@ -1648,7 +1863,17 @@ document.getElementById('btn-confirm-delete').addEventListener('click', async ()
 
   const { type, id, name } = state.deleteTarget;
   try {
-    if (type === 'section') {
+    if (type === 'casa') {
+      await api.deleteCasa(id);
+      state.casas = state.casas.filter(c => c.id !== id);
+      showToast(`Propiedad "${name}" eliminada`);
+      if (state.selectedCasaId === id) {
+        state.selectedCasaId = state.casas[0]?.id || 'casa_floresta';
+        localStorage.setItem('inventario_selected_casa', state.selectedCasaId);
+      }
+      await reloadAppData();
+      renderCasasManageView();
+    } else if (type === 'section') {
       await api.deleteSection(id);
       state.sections = state.sections.filter(s => s.id !== id);
       showToast(`Sección "${name}" eliminada de SQL`);
@@ -1740,8 +1965,12 @@ function exportInventoryToCSV() {
 
 function setupEventListeners() {
   // Pestañas de navegación de vistas
-  document.getElementById('nav-tab-inventory').addEventListener('click', () => switchView('inventory'));
-  document.getElementById('nav-tab-sections').addEventListener('click', () => switchView('sections'));
+  document.getElementById('nav-tab-inventory')?.addEventListener('click', () => switchView('inventory'));
+  document.getElementById('nav-tab-sections')?.addEventListener('click', () => switchView('sections'));
+  document.getElementById('nav-tab-casas')?.addEventListener('click', () => switchView('casas'));
+
+  // Botón nueva propiedad en panel de casas
+  document.getElementById('btn-casas-panel-add')?.addEventListener('click', openPropertyModalForAdd);
 
   // Botones de agregar
   document.getElementById('btn-open-add').addEventListener('click', openModalForAdd);
@@ -2189,6 +2418,7 @@ async function reloadAppData() {
     renderPropertySwitcher();
     renderInventoryView();
     renderSectionsManageView();
+    renderCasasManageView();
   } catch (err) {
     if (err.message === 'AUTH_REQUIRED') {
       showAuthGate();
@@ -2349,6 +2579,7 @@ function setupAuthAndCasasEvents() {
   if (propertyForm) {
     propertyForm.addEventListener('submit', async (e) => {
       e.preventDefault();
+      const propId = document.getElementById('prop-id').value;
       const nombre = document.getElementById('prop-nombre').value.trim();
       const icono = document.getElementById('prop-icono').value || '🏡';
       const direccion = document.getElementById('prop-direccion').value.trim();
@@ -2360,16 +2591,33 @@ function setupAuthAndCasasEvents() {
       }
 
       try {
-        const nuevaCasa = await api.createCasa({ nombre, icono, direccion, descripcion });
-        state.casas.push(nuevaCasa);
-        state.selectedCasaId = nuevaCasa.id;
-        localStorage.setItem('inventario_selected_casa', nuevaCasa.id);
-        
-        propertyModalOverlay.classList.add('hidden');
-        showToast(`¡Propiedad "${nuevaCasa.nombre}" creada y seleccionada!`);
-        await reloadAppData();
+        if (propId) {
+          // Actualizar casa existente
+          const updated = await api.updateCasa(propId, { nombre, icono, direccion, descripcion });
+          const idx = state.casas.findIndex(c => c.id === propId);
+          if (idx !== -1) {
+            state.casas[idx] = { ...state.casas[idx], ...updated };
+          }
+          propertyModalOverlay.classList.add('hidden');
+          showToast(`¡Propiedad "${nombre}" actualizada!`);
+          await reloadAppData();
+        } else {
+          // Crear nueva casa
+          const nuevaCasa = await api.createCasa({ nombre, icono, direccion, descripcion });
+          state.casas.push(nuevaCasa);
+          state.selectedCasaId = nuevaCasa.id;
+          localStorage.setItem('inventario_selected_casa', nuevaCasa.id);
+          
+          propertyModalOverlay.classList.add('hidden');
+          showToast(`¡Propiedad "${nuevaCasa.nombre}" creada y seleccionada!`);
+          await reloadAppData();
+        }
+
+        if (state.currentView === 'casas') {
+          renderCasasManageView();
+        }
       } catch (err) {
-        showToast(err.message || 'Error al crear propiedad', 'error');
+        showToast(err.message || 'Error al guardar propiedad', 'error');
       }
     });
   }
