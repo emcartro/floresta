@@ -17,15 +17,19 @@ const STORE_CATEGORIES = 'categories';
 // Estado global de la aplicación
 const state = {
   currentView: 'inventory', // 'inventory' | 'sections'
+  viewMode: 'cards',        // 'cards' | 'list'
   sections: [],
   categories: [],
   items: [],
   selectedSection: 'ALL',   // 'ALL' o nombre de la sección
-  selectedTag: 'ALL',       // 'ALL', 'Guardar', 'Donar', 'Vender'
+  selectedTag: 'ALL',       // 'ALL', 'Guardar', 'Llevar', 'Donar', 'Vender'
   selectedCategory: 'ALL',  // 'ALL' o nombre de la categoría
   searchQuery: '',
   sortBy: 'recent',
   
+  // Visualización detallada de Ítem (Popup)
+  viewingItemId: null,
+
   // Edición de Ítem
   editingItemId: null,
   stagedPhotos: [], // Array de URLs o File objects { file, previewUrl, isExisting }
@@ -354,12 +358,22 @@ function updateCategoryFilterDropdown() {
   const currentVal = state.selectedCategory || 'ALL';
   select.innerHTML = '<option value="ALL">Todas las Categorías</option>';
 
-  state.categories.forEach(cat => {
+  // Solo mostrar categorías que tengan al menos 1 producto registrado
+  const activeCategories = state.categories.filter(cat => {
+    return state.items.some(i => (i.categoria || 'Mobiliario') === cat.nombre);
+  });
+
+  // Si la categoría seleccionada actualmente ya no tiene productos, resetear a 'ALL'
+  if (currentVal !== 'ALL' && !activeCategories.some(c => c.nombre === currentVal)) {
+    state.selectedCategory = 'ALL';
+  }
+
+  activeCategories.forEach(cat => {
     const opt = document.createElement('option');
     opt.value = cat.nombre;
     const count = state.items.filter(i => (i.categoria || 'Mobiliario') === cat.nombre).length;
     opt.textContent = `${cat.icono || '🏷️'} ${cat.nombre} (${count})`;
-    if (cat.nombre === currentVal) opt.selected = true;
+    if (cat.nombre === state.selectedCategory) opt.selected = true;
     select.appendChild(opt);
   });
 }
@@ -426,6 +440,7 @@ function renderMetrics() {
   const totalItems = state.items.length;
   const totalPiezas = state.items.reduce((acc, curr) => acc + (Number(curr.cantidad) || 1), 0);
   const guardar = state.items.filter((i) => i.etiqueta_destino === 'Guardar').length;
+  const llevar = state.items.filter((i) => i.etiqueta_destino === 'Llevar').length;
   const donar = state.items.filter((i) => i.etiqueta_destino === 'Donar').length;
   const venderItems = state.items.filter((i) => i.etiqueta_destino === 'Vender');
   const venderCount = venderItems.length;
@@ -439,12 +454,16 @@ function renderMetrics() {
   const totalLabel = totalPiezas !== totalItems ? `${totalItems} (${totalPiezas} pzs)` : `${totalItems}`;
   document.getElementById('metric-total-items').textContent = totalLabel;
   document.getElementById('metric-guardar-items').textContent = guardar;
+  const metricLlevarEl = document.getElementById('metric-llevar-items');
+  if (metricLlevarEl) metricLlevarEl.textContent = llevar;
   document.getElementById('metric-donar-items').textContent = donar;
   document.getElementById('metric-vender-items').textContent = venderCount;
   document.getElementById('metric-vender-total').textContent = formatMoney(totalVentaEstimada);
 
   document.getElementById('pill-count-all').textContent = totalItems;
   document.getElementById('pill-count-guardar').textContent = guardar;
+  const pillLlevarEl = document.getElementById('pill-count-llevar');
+  if (pillLlevarEl) pillLlevarEl.textContent = llevar;
   document.getElementById('pill-count-donar').textContent = donar;
   document.getElementById('pill-count-vender').textContent = venderCount;
 
@@ -535,6 +554,13 @@ function renderItemsList() {
   currentTitleEl.textContent = state.selectedSection === 'ALL' ? 'Todas las Habitaciones' : state.selectedSection;
   currentCounterEl.textContent = `${filteredList.length} artículo${filteredList.length === 1 ? '' : 's'}`;
 
+  // Aplicar modo de visualización: Tarjetas ('cards') o Lista compacta ('list')
+  if (state.viewMode === 'list') {
+    container.classList.add('items-container-list');
+  } else {
+    container.classList.remove('items-container-list');
+  }
+
   container.innerHTML = '';
 
   if (filteredList.length === 0) {
@@ -571,6 +597,17 @@ function renderItemsList() {
             <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
           </svg>
           Guardar
+        </span>
+      `;
+    } else if (item.etiqueta_destino === 'Llevar') {
+      badgeHtml = `
+        <span class="item-badge-destination badge-llevar">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M5 18H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.19M15 6h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3.19"/>
+            <path d="M7 6h10v12H7z"/>
+            <path d="M10 6V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3"/>
+          </svg>
+          Llevar
         </span>
       `;
     } else if (item.etiqueta_destino === 'Donar') {
@@ -616,10 +653,10 @@ function renderItemsList() {
     const catIcon = catObj ? catObj.icono : '🏷️';
     const categoriaNombre = item.categoria || 'Mobiliario';
 
-    // Foto de portada si existe
+    // Foto de portada si existe; en caso contrario, mostrar imagen/placeholder por defecto de la categoría
     const hasPhotos = Array.isArray(item.fotos) && item.fotos.length > 0;
     const coverPhotoHtml = hasPhotos ? `
-      <div class="card-photo-wrapper" data-item-id="${item.id}" title="Ver fotos en alta resolución">
+      <div class="card-photo-wrapper card-photo-has-real" data-item-id="${item.id}" title="Ver fotos en alta resolución">
         <img src="${item.fotos[0]}" alt="${escapeHTML(item.nombre)}" class="card-photo-img" loading="lazy">
         <div class="photo-badge-card">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
@@ -629,7 +666,14 @@ function renderItemsList() {
           ${item.fotos.length} ${item.fotos.length === 1 ? 'foto' : 'fotos'}
         </div>
       </div>
-    ` : '';
+    ` : `
+      <div class="card-photo-wrapper card-photo-default-cat" data-item-id="${item.id}" title="Ver detalles del artículo">
+        <div class="card-photo-placeholder">
+          <span class="placeholder-cat-icon">${catIcon}</span>
+          <span class="placeholder-cat-label">${escapeHTML(categoriaNombre)}</span>
+        </div>
+      </div>
+    `;
 
     card.innerHTML = `
       ${coverPhotoHtml}
@@ -670,14 +714,21 @@ function renderItemsList() {
           ${formatDate(item.fecha_registro)}
         </span>
         <div class="card-actions">
-          <button class="btn-card-action btn-card-edit" data-id="${item.id}" aria-label="Editar">
+          <button class="btn-card-view" data-id="${item.id}" aria-label="Visualizar información completa" title="Visualizar información completa">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            Visualizar
+          </button>
+          <button class="btn-card-action btn-card-edit" data-id="${item.id}" aria-label="Editar" title="Editar ítem">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 20h9"/>
               <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
             </svg>
             Editar
           </button>
-          <button class="btn-card-action btn-card-delete" data-id="${item.id}" data-name="${escapeHTML(item.nombre)}" aria-label="Eliminar">
+          <button class="btn-card-action btn-card-delete" data-id="${item.id}" data-name="${escapeHTML(item.nombre)}" aria-label="Eliminar" title="Eliminar ítem">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"/>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
@@ -688,12 +739,21 @@ function renderItemsList() {
       </div>
     `;
 
-    // Click en foto para abrir Lightbox
-    if (hasPhotos) {
-      const photoEl = card.querySelector('.card-photo-wrapper');
+    // Click en foto real para abrir Lightbox, o en placeholder para abrir Visualización completa
+    const photoEl = card.querySelector('.card-photo-wrapper');
+    if (photoEl) {
       photoEl.addEventListener('click', () => {
-        openLightbox(item.fotos, 0, item.nombre);
+        if (hasPhotos) {
+          openLightbox(item.fotos, 0, item.nombre);
+        } else {
+          openItemViewModal(item.id);
+        }
       });
+    }
+
+    const viewBtn = card.querySelector('.btn-card-view');
+    if (viewBtn) {
+      viewBtn.addEventListener('click', () => openItemViewModal(item.id));
     }
 
     const editBtn = card.querySelector('.btn-card-edit');
@@ -1076,6 +1136,161 @@ function closeModal() {
   state.stagedPhotos = [];
 }
 
+// =============================================================================
+// MODAL DE VISUALIZACIÓN COMPLETA DE DETALLE DE ÍTEM (POPUP INFORMATIVO)
+// =============================================================================
+
+const itemViewModalOverlay = document.getElementById('item-view-modal-overlay');
+const viewItemBadges = document.getElementById('view-item-badges');
+const viewItemContent = document.getElementById('view-item-content');
+const btnCloseViewModal = document.getElementById('btn-close-view-modal');
+const btnViewModalClose = document.getElementById('btn-view-modal-close');
+const btnViewModalEdit = document.getElementById('btn-view-modal-edit');
+
+function openItemViewModal(itemId) {
+  const item = state.items.find(i => i.id === itemId);
+  if (!item) return;
+
+  state.viewingItemId = itemId;
+
+  // Iconos de sección y categoría
+  const secObj = state.sections.find(s => s.nombre === item.seccion);
+  const secIcon = secObj ? secObj.icono : '📦';
+  const catObj = state.categories.find(c => c.nombre === item.categoria);
+  const catIcon = catObj ? catObj.icono : '🏷️';
+  const categoriaNombre = item.categoria || 'Mobiliario';
+  const cantidad = Number(item.cantidad) || 1;
+
+  // Badges superiores
+  let destBadgeClass = 'badge-guardar';
+  if (item.etiqueta_destino === 'Llevar') destBadgeClass = 'badge-llevar';
+  else if (item.etiqueta_destino === 'Donar') destBadgeClass = 'badge-donar';
+  else if (item.etiqueta_destino === 'Vender') destBadgeClass = 'badge-vender';
+
+  viewItemBadges.innerHTML = `
+    <span class="item-badge-destination ${destBadgeClass}">
+      ${escapeHTML(item.etiqueta_destino)}
+    </span>
+    <span class="item-category-pill">
+      ${catIcon} ${escapeHTML(categoriaNombre)}
+    </span>
+    ${cantidad > 1 ? `<span class="item-quantity-pill">Cant: ${cantidad}</span>` : ''}
+  `;
+
+  // Precios para artículos de venta
+  let priceHtml = '';
+  if (item.etiqueta_destino === 'Vender') {
+    const unitPrice = Number(item.precio_venta) || 0;
+    const totalPrice = unitPrice * cantidad;
+    priceHtml = `
+      <div class="view-info-item" style="grid-column: span 2; background: #f0fdf4; padding: 8px; border-radius: 8px; border: 1px solid #bbf7d0;">
+        <span class="view-info-label" style="color: #166534;">Valor Estimado de Venta</span>
+        <span class="view-info-value" style="color: #15803d; font-size: 1.15rem;">
+          ${formatMoney(totalPrice)}
+          ${cantidad > 1 ? `<small style="font-size:0.8rem; font-weight:normal; opacity:0.85;">(${formatMoney(unitPrice)} cada uno)</small>` : ''}
+        </span>
+      </div>
+    `;
+  }
+
+  // Galería de fotos o placeholder
+  const hasPhotos = Array.isArray(item.fotos) && item.fotos.length > 0;
+  let photosHtml = '';
+  if (hasPhotos) {
+    photosHtml = `
+      <div>
+        <div class="view-photos-header">
+          <span>📸 Fotos Registradas (${item.fotos.length})</span>
+          <span style="font-size: 0.72rem; color: var(--text-tertiary);">Clic para ampliar</span>
+        </div>
+        <div class="view-photos-gallery" style="margin-top: 8px;">
+          ${item.fotos.map((url, idx) => `
+            <div class="view-photo-thumb" data-photo-idx="${idx}">
+              <img src="${url}" alt="Foto ${idx + 1}" loading="lazy">
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } else {
+    photosHtml = `
+      <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 20px; text-align: center; border: 1px dashed var(--border);">
+        <span style="font-size: 2.2rem; display: block; margin-bottom: 4px;">${catIcon}</span>
+        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-tertiary);">Sin fotos adjuntas (mostrando icono de ${escapeHTML(categoriaNombre)})</span>
+      </div>
+    `;
+  }
+
+  viewItemContent.innerHTML = `
+    <h2 class="view-modal-title" id="view-item-title">${escapeHTML(item.nombre)}</h2>
+
+    <div class="view-info-grid">
+      <div class="view-info-item">
+        <span class="view-info-label">Sección / Ubicación</span>
+        <span class="view-info-value">${secIcon} ${escapeHTML(item.seccion)}</span>
+      </div>
+      <div class="view-info-item">
+        <span class="view-info-label">Estado</span>
+        <span class="view-info-value">● ${escapeHTML(item.estado)}</span>
+      </div>
+      <div class="view-info-item">
+        <span class="view-info-label">Cantidad</span>
+        <span class="view-info-value">${cantidad} ${cantidad === 1 ? 'unidad' : 'unidades'}</span>
+      </div>
+      <div class="view-info-item">
+        <span class="view-info-label">Fecha de Registro</span>
+        <span class="view-info-value">${formatDate(item.fecha_registro)}</span>
+      </div>
+      ${priceHtml}
+    </div>
+
+    ${item.notas ? `
+      <div>
+        <span class="view-info-label" style="display:block; margin-bottom: 4px;">Notas / Observaciones</span>
+        <div class="view-notes-box">
+          <p class="view-notes-text">${escapeHTML(item.notas)}</p>
+        </div>
+      </div>
+    ` : ''}
+
+    ${photosHtml}
+  `;
+
+  // Asignar clics a miniaturas de fotos para Lightbox
+  if (hasPhotos) {
+    const thumbs = viewItemContent.querySelectorAll('.view-photo-thumb');
+    thumbs.forEach(thumb => {
+      thumb.addEventListener('click', () => {
+        const idx = parseInt(thumb.dataset.photoIdx, 10) || 0;
+        openLightbox(item.fotos, idx, item.nombre);
+      });
+    });
+  }
+
+  itemViewModalOverlay.classList.remove('hidden');
+}
+
+function closeItemViewModal() {
+  itemViewModalOverlay.classList.add('hidden');
+  state.viewingItemId = null;
+}
+
+if (btnCloseViewModal) btnCloseViewModal.addEventListener('click', closeItemViewModal);
+if (btnViewModalClose) btnViewModalClose.addEventListener('click', closeItemViewModal);
+if (itemViewModalOverlay) {
+  itemViewModalOverlay.addEventListener('click', (e) => {
+    if (e.target === itemViewModalOverlay) closeItemViewModal();
+  });
+}
+
+if (btnViewModalEdit) {
+  btnViewModalEdit.addEventListener('click', () => {
+    const idToEdit = state.viewingItemId;
+    closeItemViewModal();
+    if (idToEdit) openModalForEdit(idToEdit);
+  });
+}
+
 // Envío del Formulario de Ítem (Con subida de fotos a SQL)
 itemForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1330,10 +1545,35 @@ function setupEventListeners() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (!lightboxModal.classList.contains('hidden')) closeLightbox();
+      else if (!itemViewModalOverlay.classList.contains('hidden')) closeItemViewModal();
       else if (!modalOverlay.classList.contains('hidden')) closeModal();
       else if (!deleteModalOverlay.classList.contains('hidden')) closeDeleteDialog();
     }
   });
+
+  // Selector de Modo de Vista (Tarjetas / Lista)
+  const btnViewCards = document.getElementById('btn-view-cards');
+  const btnViewList = document.getElementById('btn-view-list');
+
+  if (btnViewCards && btnViewList) {
+    btnViewCards.addEventListener('click', () => {
+      state.viewMode = 'cards';
+      btnViewCards.classList.add('active');
+      btnViewCards.setAttribute('aria-pressed', 'true');
+      btnViewList.classList.remove('active');
+      btnViewList.setAttribute('aria-pressed', 'false');
+      renderItemsList();
+    });
+
+    btnViewList.addEventListener('click', () => {
+      state.viewMode = 'list';
+      btnViewList.classList.add('active');
+      btnViewList.setAttribute('aria-pressed', 'true');
+      btnViewCards.classList.remove('active');
+      btnViewCards.setAttribute('aria-pressed', 'false');
+      renderItemsList();
+    });
+  }
 
   // Filtros por etiqueta (Pills)
   const tagPills = document.querySelectorAll('.tag-pill');
