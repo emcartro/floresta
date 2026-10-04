@@ -69,10 +69,19 @@ db.exec(`
     created_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS categories (
+    id TEXT PRIMARY KEY,
+    nombre TEXT UNIQUE NOT NULL,
+    icono TEXT DEFAULT '🏷️',
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS items (
     id TEXT PRIMARY KEY,
     nombre TEXT NOT NULL,
     seccion TEXT NOT NULL,
+    categoria TEXT DEFAULT 'Mobiliario',
+    cantidad INTEGER DEFAULT 1,
     estado TEXT NOT NULL,
     etiqueta_destino TEXT NOT NULL,
     precio_venta REAL,
@@ -84,6 +93,26 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_items_seccion ON items(seccion);
   CREATE INDEX IF NOT EXISTS idx_items_destino ON items(etiqueta_destino);
+`);
+
+// Migración segura de columnas existentes en tabla items (antes de crear índices sobre ellas)
+try {
+  const tableInfo = db.prepare('PRAGMA table_info(items)').all();
+  const hasCantidad = tableInfo.some(col => col.name === 'cantidad');
+  if (!hasCantidad) {
+    db.exec('ALTER TABLE items ADD COLUMN cantidad INTEGER NOT NULL DEFAULT 1;');
+  }
+  const hasCategoria = tableInfo.some(col => col.name === 'categoria');
+  if (!hasCategoria) {
+    db.exec("ALTER TABLE items ADD COLUMN categoria TEXT NOT NULL DEFAULT 'Mobiliario';");
+  }
+} catch (e) {
+  console.warn('Nota en migración de items:', e.message);
+}
+
+// Crear índice de categoría tras asegurar que la columna existe
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_items_categoria ON items(categoria);
 `);
 
 // Migración y siembra de datos iniciales
@@ -114,25 +143,52 @@ function seedInitialData() {
     });
   }
 
+  // Inicializar categorías predeterminadas
+  const categoriesCount = db.prepare('SELECT COUNT(*) as count FROM categories').get().count;
+  if (categoriesCount === 0) {
+    console.log('🌱 Inicializando categorías predeterminadas en SQL...');
+    const defaultCategories = [
+      { id: 'cat_mobiliario', nombre: 'Mobiliario', icono: '🛋️' },
+      { id: 'cat_electro', nombre: 'Electrodoméstico', icono: '🔌' },
+      { id: 'cat_ropa', nombre: 'Ropa', icono: '👕' },
+      { id: 'cat_decoracion', nombre: 'Decoración', icono: '🖼️' },
+      { id: 'cat_tecnologia', nombre: 'Tecnología', icono: '💻' },
+      { id: 'cat_cocina', nombre: 'Cocina / Vajilla', icono: '🍽️' },
+      { id: 'cat_herramientas', nombre: 'Herramientas', icono: '🛠️' },
+      { id: 'cat_libros', nombre: 'Libros / Documentos', icono: '📚' },
+      { id: 'cat_otros', nombre: 'Otros', icono: '📦' }
+    ];
+
+    const insertCat = db.prepare(`
+      INSERT INTO categories (id, nombre, icono, created_at)
+      VALUES (?, ?, ?, ?)
+    `);
+
+    const now = new Date().toISOString();
+    defaultCategories.forEach(c => {
+      insertCat.run(c.id, c.nombre, c.icono, now);
+    });
+  }
+
   const itemsCount = db.prepare('SELECT COUNT(*) as count FROM items').get().count;
   if (itemsCount === 0) {
     console.log('🌱 Inicializando ítems de ejemplo en SQL...');
     const defaultItems = [
-      { id: 'item_seed_1', nombre: 'Cuadro principal', seccion: 'Sala', estado: 'Excelente', etiqueta_destino: 'Guardar', precio_venta: null, notas: 'Marco de madera dorada', fotos: '[]', fecha_registro: new Date(Date.now() - 3600000 * 5).toISOString() },
-      { id: 'item_seed_2', nombre: 'Comedor', seccion: 'Sala', estado: 'Buen estado', etiqueta_destino: 'Guardar', precio_venta: null, notas: 'Mesa con 6 sillas de roble', fotos: '[]', fecha_registro: new Date(Date.now() - 3600000 * 4).toISOString() },
-      { id: 'item_seed_3', nombre: 'Estatua', seccion: 'Sala', estado: 'Excelente', etiqueta_destino: 'Vender', precio_venta: 80000, notas: 'Escultura decorativa de bronce', fotos: '[]', fecha_registro: new Date(Date.now() - 3600000 * 3).toISOString() },
-      { id: 'item_seed_4', nombre: 'Panel', seccion: 'Sala', estado: 'Buen estado', etiqueta_destino: 'Guardar', precio_venta: null, notas: 'Panel acústico de pared', fotos: '[]', fecha_registro: new Date(Date.now() - 3600000 * 2).toISOString() },
-      { id: 'item_seed_5', nombre: 'Lámpara', seccion: 'Sala', estado: 'Regular', etiqueta_destino: 'Donar', precio_venta: null, notas: 'Lámpara de pie de lectura', fotos: '[]', fecha_registro: new Date(Date.now() - 3600000 * 1).toISOString() },
-      { id: 'item_seed_6', nombre: 'Sofá', seccion: 'Sala', estado: 'Buen estado', etiqueta_destino: 'Guardar', precio_venta: null, notas: 'Sofá de 3 puestos color gris', fotos: '[]', fecha_registro: new Date().toISOString() }
+      { id: 'item_seed_1', nombre: 'Cuadro principal', seccion: 'Sala', categoria: 'Decoración', cantidad: 1, estado: 'Excelente', etiqueta_destino: 'Guardar', precio_venta: null, notas: 'Marco de madera dorada', fotos: '[]', fecha_registro: new Date(Date.now() - 3600000 * 5).toISOString() },
+      { id: 'item_seed_2', nombre: 'Comedor', seccion: 'Sala', categoria: 'Mobiliario', cantidad: 1, estado: 'Buen estado', etiqueta_destino: 'Guardar', precio_venta: null, notas: 'Mesa con 6 sillas de roble', fotos: '[]', fecha_registro: new Date(Date.now() - 3600000 * 4).toISOString() },
+      { id: 'item_seed_3', nombre: 'Estatua', seccion: 'Sala', categoria: 'Decoración', cantidad: 1, estado: 'Excelente', etiqueta_destino: 'Vender', precio_venta: 80000, notas: 'Escultura decorativa de bronce', fotos: '[]', fecha_registro: new Date(Date.now() - 3600000 * 3).toISOString() },
+      { id: 'item_seed_4', nombre: 'Panel', seccion: 'Sala', categoria: 'Decoración', cantidad: 1, estado: 'Buen estado', etiqueta_destino: 'Guardar', precio_venta: null, notas: 'Panel acústico de pared', fotos: '[]', fecha_registro: new Date(Date.now() - 3600000 * 2).toISOString() },
+      { id: 'item_seed_5', nombre: 'Lámpara', seccion: 'Sala', categoria: 'Electrodoméstico', cantidad: 1, estado: 'Regular', etiqueta_destino: 'Donar', precio_venta: null, notas: 'Lámpara de pie de lectura', fotos: '[]', fecha_registro: new Date(Date.now() - 3600000 * 1).toISOString() },
+      { id: 'item_seed_6', nombre: 'Sofá', seccion: 'Sala', categoria: 'Mobiliario', cantidad: 1, estado: 'Buen estado', etiqueta_destino: 'Guardar', precio_venta: null, notas: 'Sofá de 3 puestos color gris', fotos: '[]', fecha_registro: new Date().toISOString() }
     ];
 
     const insertItem = db.prepare(`
-      INSERT INTO items (id, nombre, seccion, estado, etiqueta_destino, precio_venta, notas, fotos, fecha_registro)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO items (id, nombre, seccion, categoria, cantidad, estado, etiqueta_destino, precio_venta, notas, fotos, fecha_registro)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     defaultItems.forEach(i => {
-      insertItem.run(i.id, i.nombre, i.seccion, i.estado, i.etiqueta_destino, i.precio_venta, i.notas, i.fotos, i.fecha_registro);
+      insertItem.run(i.id, i.nombre, i.seccion, i.categoria, i.cantidad, i.estado, i.etiqueta_destino, i.precio_venta, i.notas, i.fotos, i.fecha_registro);
     });
   }
 }
@@ -218,12 +274,48 @@ const SectionRepo = {
   }
 };
 
+const CategoryRepo = {
+  getAll() {
+    const query = db.prepare('SELECT * FROM categories ORDER BY nombre ASC');
+    return query.all();
+  },
+
+  getById(id) {
+    const query = db.prepare('SELECT * FROM categories WHERE id = ?');
+    return query.get(id);
+  },
+
+  getByName(nombre) {
+    const query = db.prepare('SELECT * FROM categories WHERE LOWER(nombre) = LOWER(?)');
+    return query.get(nombre);
+  },
+
+  create({ id, nombre, icono }) {
+    const stmt = db.prepare(`
+      INSERT INTO categories (id, nombre, icono, created_at)
+      VALUES (?, ?, ?, ?)
+    `);
+    const now = new Date().toISOString();
+    stmt.run(id, nombre, icono || '🏷️', now);
+    return this.getById(id);
+  },
+
+  delete(id) {
+    const existing = this.getById(id);
+    if (!existing) return false;
+    db.prepare('DELETE FROM categories WHERE id = ?').run(id);
+    return true;
+  }
+};
+
 const ItemRepo = {
   getAll() {
     const query = db.prepare('SELECT * FROM items ORDER BY fecha_registro DESC');
     const rows = query.all();
     return rows.map(row => ({
       ...row,
+      cantidad: Number(row.cantidad) || 1,
+      categoria: row.categoria || 'Mobiliario',
       fotos: row.fotos ? JSON.parse(row.fotos) : []
     }));
   },
@@ -234,21 +326,29 @@ const ItemRepo = {
     if (!row) return null;
     return {
       ...row,
+      cantidad: Number(row.cantidad) || 1,
+      categoria: row.categoria || 'Mobiliario',
       fotos: row.fotos ? JSON.parse(row.fotos) : []
     };
   },
 
-  create({ id, nombre, seccion, estado, etiqueta_destino, precio_venta, notas, fotos, fecha_registro }) {
+  create({ id, nombre, seccion, categoria, cantidad, estado, etiqueta_destino, precio_venta, notas, fotos, fecha_registro }) {
+    const itemId = id || crypto.randomUUID();
     const stmt = db.prepare(`
-      INSERT INTO items (id, nombre, seccion, estado, etiqueta_destino, precio_venta, notas, fotos, fecha_registro)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO items (id, nombre, seccion, categoria, cantidad, estado, etiqueta_destino, precio_venta, notas, fotos, fecha_registro)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const fotosJson = JSON.stringify(Array.isArray(fotos) ? fotos : []);
     const date = fecha_registro || new Date().toISOString();
+    const qty = Math.max(1, parseInt(cantidad, 10) || 1);
+    const cat = (categoria && String(categoria).trim()) || 'Mobiliario';
+
     stmt.run(
-      id,
+      itemId,
       nombre,
       seccion,
+      cat,
+      qty,
       estado,
       etiqueta_destino,
       precio_venta !== undefined && precio_venta !== '' && precio_venta !== null ? Number(precio_venta) : null,
@@ -256,10 +356,10 @@ const ItemRepo = {
       fotosJson,
       date
     );
-    return this.getById(id);
+    return this.getById(itemId);
   },
 
-  update(id, { nombre, seccion, estado, etiqueta_destino, precio_venta, notas, fotos }) {
+  update(id, { nombre, seccion, categoria, cantidad, estado, etiqueta_destino, precio_venta, notas, fotos }) {
     const existing = this.getById(id);
     if (!existing) return null;
 
@@ -267,6 +367,8 @@ const ItemRepo = {
       UPDATE items 
       SET nombre = COALESCE(?, nombre),
           seccion = COALESCE(?, seccion),
+          categoria = COALESCE(?, categoria),
+          cantidad = COALESCE(?, cantidad),
           estado = COALESCE(?, estado),
           etiqueta_destino = COALESCE(?, etiqueta_destino),
           precio_venta = ?,
@@ -280,14 +382,18 @@ const ItemRepo = {
       : null;
 
     const fotosJson = fotos !== undefined ? JSON.stringify(Array.isArray(fotos) ? fotos : []) : JSON.stringify(existing.fotos);
+    const qty = cantidad !== undefined ? Math.max(1, parseInt(cantidad, 10) || 1) : existing.cantidad;
+    const cat = categoria !== undefined ? String(categoria).trim() : existing.categoria;
 
     stmt.run(
-      nombre,
-      seccion,
-      estado,
-      etiqueta_destino,
-      finalPrecio,
-      notas,
+      nombre !== undefined ? nombre : null,
+      seccion !== undefined ? seccion : null,
+      cat,
+      qty,
+      estado !== undefined ? estado : null,
+      etiqueta_destino !== undefined ? etiqueta_destino : null,
+      finalPrecio !== undefined ? finalPrecio : null,
+      notas !== undefined ? notas : null,
       fotosJson,
       id
     );
@@ -326,5 +432,6 @@ module.exports = {
   closeDatabase,
   reopenDatabase,
   SectionRepo,
+  CategoryRepo,
   ItemRepo
 };

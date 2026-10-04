@@ -11,6 +11,7 @@ const archiver = require('archiver');
 const AdmZip = require('adm-zip');
 const { 
   SectionRepo, 
+  CategoryRepo,
   ItemRepo, 
   UPLOADS_DIR, 
   DATA_DIR, 
@@ -172,7 +173,50 @@ app.delete('/api/sections/:id', (req, res) => {
 });
 
 // =============================================================================
-// API REST - ÍTEMS CON FOTOS
+// API REST - CATEGORÍAS
+// =============================================================================
+
+// Listar todas las categorías
+app.get('/api/categories', (req, res) => {
+  try {
+    const categories = CategoryRepo.getAll();
+    res.json(categories);
+  } catch (error) {
+    console.error('Error al obtener categorías:', error);
+    res.status(500).json({ error: 'Error al consultar categorías en SQL' });
+  }
+});
+
+// Crear nueva categoría
+app.post('/api/categories', (req, res) => {
+  try {
+    const { nombre, icono } = req.body;
+    if (!nombre || !nombre.trim()) {
+      return res.status(400).json({ error: 'El nombre de la categoría es obligatorio' });
+    }
+
+    const trimmedNombre = nombre.trim();
+    const existing = CategoryRepo.getByName(trimmedNombre);
+    if (existing) {
+      return res.status(409).json({ error: 'Ya existe una categoría con este nombre' });
+    }
+
+    const id = 'cat_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
+    const newCategory = CategoryRepo.create({
+      id,
+      nombre: trimmedNombre,
+      icono: icono || '🏷️'
+    });
+
+    res.status(201).json(newCategory);
+  } catch (error) {
+    console.error('Error al crear categoría:', error);
+    res.status(500).json({ error: 'Error al guardar categoría en SQL' });
+  }
+});
+
+// =============================================================================
+// API REST - ÍTEMS CON FOTOS, CANTIDAD Y CATEGORÍA
 // =============================================================================
 
 // Listar todos los ítems
@@ -189,7 +233,7 @@ app.get('/api/items', (req, res) => {
 // Crear nuevo ítem
 app.post('/api/items', (req, res) => {
   try {
-    const { nombre, seccion, estado, etiqueta_destino, precio_venta, notas, fotos } = req.body;
+    const { nombre, seccion, categoria, cantidad, estado, etiqueta_destino, precio_venta, notas, fotos } = req.body;
     if (!nombre || !nombre.trim()) {
       return res.status(400).json({ error: 'El nombre del ítem es obligatorio' });
     }
@@ -202,6 +246,8 @@ app.post('/api/items', (req, res) => {
       id,
       nombre: nombre.trim(),
       seccion,
+      categoria: categoria || 'Mobiliario',
+      cantidad: Math.max(1, parseInt(cantidad, 10) || 1),
       estado: estado || 'Buen estado',
       etiqueta_destino: etiqueta_destino || 'Guardar',
       precio_venta,
@@ -221,7 +267,7 @@ app.post('/api/items', (req, res) => {
 app.put('/api/items/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, seccion, estado, etiqueta_destino, precio_venta, notas, fotos } = req.body;
+    const { nombre, seccion, categoria, cantidad, estado, etiqueta_destino, precio_venta, notas, fotos } = req.body;
 
     const existing = ItemRepo.getById(id);
     if (!existing) {
@@ -231,6 +277,8 @@ app.put('/api/items/:id', (req, res) => {
     const updated = ItemRepo.update(id, {
       nombre: nombre ? nombre.trim() : undefined,
       seccion,
+      categoria,
+      cantidad,
       estado,
       etiqueta_destino,
       precio_venta,
@@ -287,7 +335,7 @@ app.post('/api/upload', upload.array('fotos', 10), (req, res) => {
 app.get('/api/export', (req, res) => {
   try {
     const items = ItemRepo.getAll();
-    const headers = ['id', 'nombre', 'seccion', 'estado', 'etiqueta_destino', 'precio_venta', 'notas', 'fotos', 'fecha_registro'];
+    const headers = ['id', 'nombre', 'seccion', 'categoria', 'cantidad', 'estado', 'etiqueta_destino', 'precio_venta', 'notas', 'fotos', 'fecha_registro'];
 
     const escapeCSV = (val) => {
       if (val === null || val === undefined) return '';
@@ -302,6 +350,8 @@ app.get('/api/export', (req, res) => {
       escapeCSV(i.id),
       escapeCSV(i.nombre),
       escapeCSV(i.seccion),
+      escapeCSV(i.categoria || 'Mobiliario'),
+      escapeCSV(i.cantidad || 1),
       escapeCSV(i.estado),
       escapeCSV(i.etiqueta_destino),
       escapeCSV(i.precio_venta !== null && i.precio_venta !== undefined ? i.precio_venta : ''),

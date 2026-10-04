@@ -9,17 +9,20 @@
 // =============================================================================
 
 const DB_NAME = 'InventarioHogarDB';
-const DB_VERSION = 2; // Versión incrementada para nuevo store de secciones
+const DB_VERSION = 3; // Versión incrementada para store de categorías
 const STORE_ITEMS = 'items';
 const STORE_SECTIONS = 'sections';
+const STORE_CATEGORIES = 'categories';
 
 // Estado global de la aplicación
 const state = {
   currentView: 'inventory', // 'inventory' | 'sections'
   sections: [],
+  categories: [],
   items: [],
   selectedSection: 'ALL',   // 'ALL' o nombre de la sección
   selectedTag: 'ALL',       // 'ALL', 'Guardar', 'Donar', 'Vender'
+  selectedCategory: 'ALL',  // 'ALL' o nombre de la categoría
   searchQuery: '',
   sortBy: 'recent',
   
@@ -63,6 +66,9 @@ function initIndexedDB() {
       if (!db.objectStoreNames.contains(STORE_SECTIONS)) {
         db.createObjectStore(STORE_SECTIONS, { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains(STORE_CATEGORIES)) {
+        db.createObjectStore(STORE_CATEGORIES, { keyPath: 'id' });
+      }
     };
     req.onsuccess = (e) => {
       idb = e.target.result;
@@ -104,6 +110,32 @@ async function readFromIndexedDB(storeName) {
 // =============================================================================
 
 const api = {
+  async getCategories() {
+    try {
+      const res = await fetch('/api/categories');
+      if (!res.ok) throw new Error('Error al cargar categorías');
+      const data = await res.json();
+      cacheToIndexedDB(STORE_CATEGORIES, data);
+      return data;
+    } catch (err) {
+      console.warn('API no disponible, leyendo categorías desde IndexedDB...');
+      return await readFromIndexedDB(STORE_CATEGORIES);
+    }
+  },
+
+  async createCategory(categoryData) {
+    const res = await fetch('/api/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(categoryData)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Error al crear la categoría en SQL');
+    }
+    return await res.json();
+  },
+
   async getSections() {
     try {
       const res = await fetch('/api/sections');
@@ -309,8 +341,46 @@ function switchView(viewName) {
 function renderInventoryView() {
   renderSectionTabs();
   renderMetrics();
+  updateCategoryFilterDropdown();
   renderItemsList();
   updateSectionDropdownInItemModal();
+  updateCategoryDropdownInItemModal();
+}
+
+function updateCategoryFilterDropdown() {
+  const select = document.getElementById('filter-categoria');
+  if (!select) return;
+
+  const currentVal = state.selectedCategory || 'ALL';
+  select.innerHTML = '<option value="ALL">Todas las Categorías</option>';
+
+  state.categories.forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat.nombre;
+    const count = state.items.filter(i => (i.categoria || 'Mobiliario') === cat.nombre).length;
+    opt.textContent = `${cat.icono || '🏷️'} ${cat.nombre} (${count})`;
+    if (cat.nombre === currentVal) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
+function updateCategoryDropdownInItemModal() {
+  const select = document.getElementById('form-categoria');
+  if (!select) return;
+
+  const currentVal = select.value;
+  select.innerHTML = '';
+
+  state.categories.forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat.nombre;
+    opt.textContent = `${cat.icono || '🏷️'} ${cat.nombre}`;
+    select.appendChild(opt);
+  });
+
+  if (currentVal && state.categories.some(c => c.nombre === currentVal)) {
+    select.value = currentVal;
+  }
 }
 
 function renderSectionTabs() {
@@ -353,23 +423,27 @@ function renderSectionTabs() {
 }
 
 function renderMetrics() {
-  const total = state.items.length;
+  const totalItems = state.items.length;
+  const totalPiezas = state.items.reduce((acc, curr) => acc + (Number(curr.cantidad) || 1), 0);
   const guardar = state.items.filter((i) => i.etiqueta_destino === 'Guardar').length;
   const donar = state.items.filter((i) => i.etiqueta_destino === 'Donar').length;
   const venderItems = state.items.filter((i) => i.etiqueta_destino === 'Vender');
   const venderCount = venderItems.length;
   
   const totalVentaEstimada = venderItems.reduce((acc, curr) => {
-    return acc + (Number(curr.precio_venta) || 0);
+    const qty = Number(curr.cantidad) || 1;
+    return acc + ((Number(curr.precio_venta) || 0) * qty);
   }, 0);
 
-  document.getElementById('metric-total-items').textContent = total;
+  // Muestra total ítems (y piezas si son más de 1 por ítem)
+  const totalLabel = totalPiezas !== totalItems ? `${totalItems} (${totalPiezas} pzs)` : `${totalItems}`;
+  document.getElementById('metric-total-items').textContent = totalLabel;
   document.getElementById('metric-guardar-items').textContent = guardar;
   document.getElementById('metric-donar-items').textContent = donar;
   document.getElementById('metric-vender-items').textContent = venderCount;
   document.getElementById('metric-vender-total').textContent = formatMoney(totalVentaEstimada);
 
-  document.getElementById('pill-count-all').textContent = total;
+  document.getElementById('pill-count-all').textContent = totalItems;
   document.getElementById('pill-count-guardar').textContent = guardar;
   document.getElementById('pill-count-donar').textContent = donar;
   document.getElementById('pill-count-vender').textContent = venderCount;
@@ -413,12 +487,17 @@ function getFilteredAndSortedItems() {
     list = list.filter((item) => item.etiqueta_destino === state.selectedTag);
   }
 
+  if (state.selectedCategory !== 'ALL') {
+    list = list.filter((item) => (item.categoria || 'Mobiliario') === state.selectedCategory);
+  }
+
   if (state.searchQuery.trim() !== '') {
     const q = state.searchQuery.toLowerCase();
     list = list.filter((item) =>
       (item.nombre && item.nombre.toLowerCase().includes(q)) ||
       (item.notas && item.notas.toLowerCase().includes(q)) ||
-      (item.seccion && item.seccion.toLowerCase().includes(q))
+      (item.seccion && item.seccion.toLowerCase().includes(q)) ||
+      (item.categoria && item.categoria.toLowerCase().includes(q))
     );
   }
 
@@ -467,6 +546,8 @@ function renderItemsList() {
       msgEl.textContent = `No hay resultados para "${state.searchQuery}". Intenta con otra palabra clave.`;
     } else if (state.selectedTag !== 'ALL') {
       msgEl.textContent = `No hay artículos con la etiqueta "${state.selectedTag}" en esta sección.`;
+    } else if (state.selectedCategory !== 'ALL') {
+      msgEl.textContent = `No hay artículos con la categoría "${state.selectedCategory}".`;
     } else {
       msgEl.textContent = `No hay artículos registrados aún en ${state.selectedSection === 'ALL' ? 'el inventario' : state.selectedSection}.`;
     }
@@ -480,7 +561,8 @@ function renderItemsList() {
     const card = document.createElement('article');
     card.className = 'item-card';
 
-    // Badge de destino
+    // Destino y precio (incorporando cantidad en venta)
+    const cantidad = Number(item.cantidad) || 1;
     let badgeHtml = '';
     if (item.etiqueta_destino === 'Guardar') {
       badgeHtml = `
@@ -501,13 +583,18 @@ function renderItemsList() {
         </span>
       `;
     } else if (item.etiqueta_destino === 'Vender') {
+      const unitPrice = Number(item.precio_venta) || 0;
+      const totalPrice = unitPrice * cantidad;
+      const priceText = cantidad > 1 
+        ? `${formatMoney(totalPrice)} <small style="opacity:0.85; font-size:0.75rem;">(${formatMoney(unitPrice)} c/u)</small>`
+        : formatMoney(unitPrice);
       badgeHtml = `
         <span class="item-badge-destination badge-vender">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="12" y1="1" x2="12" y2="23"/>
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
           </svg>
-          Vender: <strong class="badge-price">${formatMoney(item.precio_venta)}</strong>
+          Vender: <strong class="badge-price">${priceText}</strong>
         </span>
       `;
     }
@@ -523,6 +610,11 @@ function renderItemsList() {
     // Sección icono
     const secObj = state.sections.find(s => s.nombre === item.seccion);
     const secIcon = secObj ? secObj.icono : '📦';
+
+    // Categoría icono
+    const catObj = state.categories.find(c => c.nombre === item.categoria);
+    const catIcon = catObj ? catObj.icono : '🏷️';
+    const categoriaNombre = item.categoria || 'Mobiliario';
 
     // Foto de portada si existe
     const hasPhotos = Array.isArray(item.fotos) && item.fotos.length > 0;
@@ -545,10 +637,17 @@ function renderItemsList() {
         <div class="card-top">
           <div>
             <h3 class="item-name">${escapeHTML(item.nombre)}</h3>
-            <span class="item-section-tag">
-              <span>${secIcon}</span>
-              ${escapeHTML(item.seccion)}
-            </span>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px;">
+              <span class="item-section-tag">
+                <span>${secIcon}</span>
+                ${escapeHTML(item.seccion)}
+              </span>
+              <span class="item-category-pill">
+                <span>${catIcon}</span>
+                ${escapeHTML(categoriaNombre)}
+              </span>
+              ${cantidad > 1 ? `<span class="item-quantity-pill">Cant: ${cantidad}</span>` : ''}
+            </div>
           </div>
           ${badgeHtml}
         </div>
@@ -903,10 +1002,18 @@ function openModalForAdd() {
   document.getElementById('error-nombre').textContent = '';
   document.getElementById('error-precio').textContent = '';
 
+  // Cantidad por defecto
+  document.getElementById('form-cantidad').value = '1';
+
   updateSectionDropdownInItemModal();
+  updateCategoryDropdownInItemModal();
 
   if (state.selectedSection !== 'ALL') {
     document.getElementById('form-seccion').value = state.selectedSection;
+  }
+
+  if (state.selectedCategory !== 'ALL') {
+    document.getElementById('form-categoria').value = state.selectedCategory;
   }
 
   const guardarRadio = document.querySelector('input[name="etiqueta_destino"][value="Guardar"]');
@@ -931,7 +1038,11 @@ function openModalForEdit(id) {
   document.getElementById('form-nombre').value = item.nombre;
   
   updateSectionDropdownInItemModal();
+  updateCategoryDropdownInItemModal();
+
   document.getElementById('form-seccion').value = item.seccion;
+  document.getElementById('form-categoria').value = item.categoria || (state.categories[0] ? state.categories[0].nombre : 'Mobiliario');
+  document.getElementById('form-cantidad').value = item.cantidad || 1;
   document.getElementById('form-estado').value = item.estado;
   document.getElementById('form-notas').value = item.notas || '';
 
@@ -984,6 +1095,8 @@ itemForm.addEventListener('submit', async (e) => {
   }
 
   const seccionVal = document.getElementById('form-seccion').value;
+  const categoriaVal = document.getElementById('form-categoria').value || 'Mobiliario';
+  const cantidadVal = Math.max(1, parseInt(document.getElementById('form-cantidad').value, 10) || 1);
   const estadoVal = document.getElementById('form-estado').value;
   const etiquetaVal = document.querySelector('input[name="etiqueta_destino"]:checked')?.value || 'Guardar';
   
@@ -1026,6 +1139,8 @@ itemForm.addEventListener('submit', async (e) => {
       const updated = await api.updateItem(state.editingItemId, {
         nombre: nombreVal,
         seccion: seccionVal,
+        categoria: categoriaVal,
+        cantidad: cantidadVal,
         estado: estadoVal,
         etiqueta_destino: etiquetaVal,
         precio_venta: precioVal,
@@ -1041,6 +1156,8 @@ itemForm.addEventListener('submit', async (e) => {
       const created = await api.createItem({
         nombre: nombreVal,
         seccion: seccionVal,
+        categoria: categoriaVal,
+        cantidad: cantidadVal,
         estado: estadoVal,
         etiqueta_destino: etiquetaVal,
         precio_venta: precioVal,
@@ -1365,6 +1482,105 @@ function setupEventListeners() {
     }
   });
 
+  // Modal para Crear Nueva Categoría Rápida
+  const categoryModal = document.getElementById('category-modal-overlay');
+  const btnOpenQuickCategory = document.getElementById('btn-open-quick-category');
+  const btnCloseCatModal = document.getElementById('btn-close-cat-modal');
+  const btnCancelNewCat = document.getElementById('btn-cancel-new-cat');
+  const quickCatForm = document.getElementById('quick-category-form');
+  const newCatNombreInput = document.getElementById('new-cat-nombre');
+  const newCatIconoInput = document.getElementById('new-cat-icono');
+  const newCatError = document.getElementById('new-cat-error');
+  const catEmojiPicker = document.getElementById('cat-emoji-picker');
+
+  function openCategoryModal() {
+    newCatNombreInput.value = '';
+    newCatIconoInput.value = '🏷️';
+    newCatError.textContent = '';
+    categoryModal.classList.remove('hidden');
+    newCatNombreInput.focus();
+  }
+
+  function closeCategoryModal() {
+    categoryModal.classList.add('hidden');
+  }
+
+  if (btnOpenQuickCategory) btnOpenQuickCategory.addEventListener('click', openCategoryModal);
+  if (btnCloseCatModal) btnCloseCatModal.addEventListener('click', closeCategoryModal);
+  if (btnCancelNewCat) btnCancelNewCat.addEventListener('click', closeCategoryModal);
+  if (categoryModal) {
+    categoryModal.addEventListener('click', (e) => {
+      if (e.target === categoryModal) closeCategoryModal();
+    });
+  }
+
+  if (catEmojiPicker) {
+    catEmojiPicker.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-emoji');
+      if (btn && btn.dataset.emoji) {
+        newCatIconoInput.value = btn.dataset.emoji;
+      }
+    });
+  }
+
+  if (quickCatForm) {
+    quickCatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      newCatError.textContent = '';
+      const nombre = newCatNombreInput.value.trim();
+      const icono = newCatIconoInput.value.trim() || '🏷️';
+
+      if (!nombre) {
+        newCatError.textContent = 'El nombre de la categoría es obligatorio.';
+        newCatNombreInput.focus();
+        return;
+      }
+
+      try {
+        const created = await api.createCategory({ nombre, icono });
+        state.categories.push(created);
+        showToast(`Categoría "${created.nombre}" creada con éxito`);
+        closeCategoryModal();
+
+        // Actualizar dropdowns y seleccionar la categoría creada
+        updateCategoryDropdownInItemModal();
+        updateCategoryFilterDropdown();
+        const itemCatSelect = document.getElementById('form-categoria');
+        if (itemCatSelect) itemCatSelect.value = created.nombre;
+      } catch (err) {
+        newCatError.textContent = err.message || 'Error al guardar la categoría';
+      }
+    });
+  }
+
+  // Stepper de Cantidad (+ / -)
+  const qtyInput = document.getElementById('form-cantidad');
+  const btnQtyMinus = document.getElementById('btn-qty-minus');
+  const btnQtyPlus = document.getElementById('btn-qty-plus');
+
+  if (btnQtyMinus && qtyInput) {
+    btnQtyMinus.addEventListener('click', () => {
+      const current = parseInt(qtyInput.value, 10) || 1;
+      if (current > 1) qtyInput.value = current - 1;
+    });
+  }
+
+  if (btnQtyPlus && qtyInput) {
+    btnQtyPlus.addEventListener('click', () => {
+      const current = parseInt(qtyInput.value, 10) || 1;
+      qtyInput.value = current + 1;
+    });
+  }
+
+  // Filtro desplegable de categoría en la barra de herramientas
+  const filterCatSelect = document.getElementById('filter-categoria');
+  if (filterCatSelect) {
+    filterCatSelect.addEventListener('change', (e) => {
+      state.selectedCategory = e.target.value;
+      renderItemsList();
+    });
+  }
+
   // Detección de conectividad online/offline
   const offlineBadge = document.getElementById('offline-badge');
   function updateOnlineStatus() {
@@ -1416,12 +1632,14 @@ async function initApp() {
   await initIndexedDB();
 
   try {
-    // Cargar secciones e ítems desde SQL (con fallback IndexedDB automático)
-    const [sections, items] = await Promise.all([
+    // Cargar categorías, secciones e ítems desde SQL (con fallback IndexedDB automático)
+    const [categories, sections, items] = await Promise.all([
+      api.getCategories(),
       api.getSections(),
       api.getItems()
     ]);
 
+    state.categories = categories || [];
     state.sections = sections || [];
     state.items = items || [];
 
@@ -1434,3 +1652,4 @@ async function initApp() {
 }
 
 document.addEventListener('DOMContentLoaded', initApp);
+

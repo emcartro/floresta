@@ -1947,3 +1947,124 @@ body {
   font-size: 0.82rem;
   font-weight: 600;
 }
+
+/* ==========================================================================
+   ESTILOS DE CATEGORÍAS Y CANTIDAD DE PRODUCTOS
+   ========================================================================== */
+.category-filter-wrapper {
+  margin-top: 4px;
+}
+
+.category-select-box {
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  gap: 8px;
+  box-shadow: var(--shadow-xs);
+}
+
+.category-select-icon {
+  font-size: 0.9rem;
+}
+
+.category-filter-select {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  width: 100%;
+  outline: none;
+  cursor: pointer;
+}
+
+.btn-text-action {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.btn-text-action:hover {
+  text-decoration: underline;
+  background: var(--primary-light);
+}
+
+/* Stepper de Cantidad */
+.qty-stepper-box {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  overflow: hidden;
+}
+
+.btn-qty-step {
+  background: white;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 700;
+  width: 38px;
+  height: 40px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+
+.btn-qty-step:hover {
+  background: var(--bg-subtle);
+  color: var(--primary);
+}
+
+.form-input-qty {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 8px !important;
+  font-weight: 700 !important;
+  height: 40px;
+  -moz-appearance: textfield;
+}
+
+.form-input-qty::-webkit-outer-spin-button,
+.form-input-qty::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Badges de Categoría y Cantidad en las Tarjetas */
+.item-category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.item-quantity-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #1e40af;
+  background: #dbeafe;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}

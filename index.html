@@ -195,6 +195,17 @@
             <span class="pill-count" id="pill-count-vender">0</span>
           </button>
         </div>
+
+        <!-- Filtro por Categoría -->
+        <div class="category-filter-wrapper">
+          <label for="filter-categoria" class="sr-only">Filtrar por Categoría</label>
+          <div class="category-select-box">
+            <span class="category-select-icon">🏷️</span>
+            <select id="filter-categoria" class="category-filter-select" aria-label="Filtrar por categoría">
+              <option value="ALL">Todas las Categorías</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <!-- Secciones Tabs (Horizontal Scroller) -->
@@ -463,6 +474,43 @@
           </div>
         </div>
 
+        <!-- Fila Categoría & Cantidad -->
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label for="form-categoria" class="form-label">
+                Categoría <span class="required-indicator">*</span>
+              </label>
+              <button type="button" id="btn-open-quick-category" class="btn-text-action" title="Crear nueva categoría">
+                + Nueva
+              </button>
+            </div>
+            <select id="form-categoria" name="categoria" class="form-select" required>
+              <!-- Llenado dinámicamente con las categorías -->
+            </select>
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="form-cantidad" class="form-label">
+              Cantidad <span class="required-indicator">*</span>
+            </label>
+            <div class="qty-stepper-box">
+              <button type="button" id="btn-qty-minus" class="btn-qty-step" aria-label="Disminuir">−</button>
+              <input 
+                type="number" 
+                id="form-cantidad" 
+                name="cantidad" 
+                class="form-input form-input-qty text-center" 
+                value="1" 
+                min="1" 
+                max="9999" 
+                required
+              >
+              <button type="button" id="btn-qty-plus" class="btn-qty-step" aria-label="Aumentar">+</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Fila Sección & Estado -->
         <div class="form-row">
           <div class="form-group flex-1">
@@ -726,6 +774,56 @@
         <button id="btn-cancel-restore" class="btn btn-secondary flex-1">Cancelar</button>
         <button id="btn-confirm-restore" class="btn btn-primary flex-1" style="background:#d97706;">Confirmar Restauración</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal para Crear Nueva Categoría -->
+  <div id="category-modal-overlay" class="modal-overlay hidden" aria-hidden="true">
+    <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="cat-modal-title" style="text-align: left; align-items: stretch; max-width: 440px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+        <h3 id="cat-modal-title" class="confirm-title" style="font-size: 1.1rem;">🏷️ Nueva Categoría</h3>
+        <button id="btn-close-cat-modal" class="btn-icon-subtle" aria-label="Cerrar">✕</button>
+      </div>
+
+      <form id="quick-category-form" style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+        <div class="form-group">
+          <label for="new-cat-nombre" class="form-label">Nombre de la Categoría <span class="required-indicator">*</span></label>
+          <input type="text" id="new-cat-nombre" class="form-input" placeholder="Ej. Joyería, Juguetes, Mascotas..." required maxlength="40">
+          <span class="form-error" id="new-cat-error"></span>
+        </div>
+
+        <div class="form-group">
+          <label for="new-cat-icono" class="form-label">Icono / Emoji</label>
+          <input type="text" id="new-cat-icono" class="form-input text-center text-emoji" value="🏷️" maxlength="4">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size: 0.78rem;">Sugerencias de emojis:</label>
+          <div class="emoji-picker-row" id="cat-emoji-picker">
+            <button type="button" class="btn-emoji" data-emoji="🛋️">🛋️</button>
+            <button type="button" class="btn-emoji" data-emoji="🔌">🔌</button>
+            <button type="button" class="btn-emoji" data-emoji="👕">👕</button>
+            <button type="button" class="btn-emoji" data-emoji="🖼️">🖼️</button>
+            <button type="button" class="btn-emoji" data-emoji="💻">💻</button>
+            <button type="button" class="btn-emoji" data-emoji="🍽️">🍽️</button>
+            <button type="button" class="btn-emoji" data-emoji="🛠️">🛠️</button>
+            <button type="button" class="btn-emoji" data-emoji="📚">📚</button>
+            <button type="button" class="btn-emoji" data-emoji="📦">📦</button>
+            <button type="button" class="btn-emoji" data-emoji="🧸">🧸</button>
+            <button type="button" class="btn-emoji" data-emoji="💎">💎</button>
+            <button type="button" class="btn-emoji" data-emoji="🐾">🐾</button>
+            <button type="button" class="btn-emoji" data-emoji="🎮">🎮</button>
+            <button type="button" class="btn-emoji" data-emoji="⚽">⚽</button>
+            <button type="button" class="btn-emoji" data-emoji="🧴">🧴</button>
+            <button type="button" class="btn-emoji" data-emoji="🌿">🌿</button>
+          </div>
+        </div>
+
+        <div class="confirm-actions" style="margin-top: 8px;">
+          <button type="button" id="btn-cancel-new-cat" class="btn btn-secondary flex-1">Cancelar</button>
+          <button type="submit" class="btn btn-primary flex-1">Crear Categoría</button>
+        </div>
+      </form>
     </div>
   </div>
 
