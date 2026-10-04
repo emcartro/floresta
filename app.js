@@ -573,8 +573,17 @@ function renderSectionTabs() {
   });
   container.appendChild(allBtn);
 
-  // Tabs por cada sección existente en la base de datos
-  state.sections.forEach((sec) => {
+  // Tabs solo para las secciones que tienen ítems registrados en esta casa
+  const sectionsWithItems = state.sections.filter((sec) => {
+    return state.items.some((i) => i.seccion === sec.nombre);
+  });
+
+  // Si la sección seleccionada actualmente ya no tiene ítems, volver a 'ALL'
+  if (state.selectedSection !== 'ALL' && !sectionsWithItems.some(s => s.nombre === state.selectedSection)) {
+    state.selectedSection = 'ALL';
+  }
+
+  sectionsWithItems.forEach((sec) => {
     const count = state.items.filter((i) => i.seccion === sec.nombre).length;
     const btn = document.createElement('button');
     btn.className = `tab-btn ${state.selectedSection === sec.nombre ? 'active' : ''}`;
@@ -944,6 +953,22 @@ function updateSectionDropdownInItemModal() {
 
 function renderSectionsManageView() {
   const container = document.getElementById('sections-manage-grid');
+  const activeCasaPill = document.getElementById('sec-active-casa-pill');
+  if (activeCasaPill) {
+    const currentCasa = state.casas.find(c => c.id === state.selectedCasaId);
+    activeCasaPill.textContent = currentCasa ? `${currentCasa.icono || '🏡'} ${currentCasa.nombre}` : '🏡 Propiedad Actual';
+  }
+
+  const sectionsCountEl = document.getElementById('sections-total-pill');
+  if (sectionsCountEl) {
+    sectionsCountEl.textContent = `${state.sections.length} habitaciones`;
+  }
+  const navSectionsCount = document.getElementById('nav-sections-count');
+  if (navSectionsCount) {
+    navSectionsCount.textContent = state.sections.length;
+  }
+
+  if (!container) return;
   container.innerHTML = '';
 
   state.sections.forEach((sec) => {
@@ -1052,11 +1077,13 @@ document.getElementById('section-form').addEventListener('submit', async (e) => 
 
   const iconoVal = iconoInput.value.trim() || '📦';
   const descVal = descInput.value.trim();
+  const currentCasaId = state.selectedCasaId || 'casa_floresta';
 
   try {
     if (state.editingSectionId) {
       // Actualizar en SQL
       const updated = await api.updateSection(state.editingSectionId, {
+        casa_id: currentCasaId,
         nombre: nombreVal,
         icono: iconoVal,
         descripcion: descVal
@@ -1067,12 +1094,13 @@ document.getElementById('section-form').addEventListener('submit', async (e) => 
       if (idx !== -1) state.sections[idx] = updated;
 
       // Refrescar ítems por si el nombre de la sección cambió en cascada
-      state.items = await api.getItems();
+      state.items = await api.getItems(currentCasaId);
 
       showToast(`Sección "${nombreVal}" actualizada con éxito`);
     } else {
       // Crear en SQL
       const created = await api.createSection({
+        casa_id: currentCasaId,
         nombre: nombreVal,
         icono: iconoVal,
         descripcion: descVal

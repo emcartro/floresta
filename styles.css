@@ -2011,8 +2011,23 @@ body {
 /* ==========================================================================
    ESTILOS DE CATEGORÍAS Y CANTIDAD DE PRODUCTOS
    ========================================================================== */
+.filters-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filters-controls-row .tag-filter-group {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .category-filter-wrapper {
-  margin-top: 4px;
+  flex: 0 0 auto;
+  margin-top: 0;
+  min-width: 200px;
 }
 
 .category-select-box {
@@ -2024,10 +2039,13 @@ body {
   padding: 6px 12px;
   gap: 8px;
   box-shadow: var(--shadow-xs);
+  height: 36px;
+  box-sizing: border-box;
 }
 
 .category-select-icon {
   font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
 .category-filter-select {
@@ -2929,6 +2947,22 @@ body {
 /* ==========================================================================
    PANEL DE ADMINISTRACIÓN DE CASAS / PROPIEDADES
    ========================================================================== */
+.sections-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.header-action-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .casas-info-banner {
   display: flex;
   align-items: flex-start;

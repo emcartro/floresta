@@ -123,7 +123,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_items_destino ON items(etiqueta_destino);
 `);
 
-// Migración segura de columnas existentes en tabla items
+// Migración segura de columnas existentes en tabla items y sections
 try {
   const tableInfo = db.prepare('PRAGMA table_info(items)').all();
   const hasCantidad = tableInfo.some(col => col.name === 'cantidad');
@@ -138,14 +138,22 @@ try {
   if (!hasCasaId) {
     db.exec("ALTER TABLE items ADD COLUMN casa_id TEXT NOT NULL DEFAULT 'casa_floresta';");
   }
+
+  // Migración de casa_id en tabla sections
+  const secTableInfo = db.prepare('PRAGMA table_info(sections)').all();
+  const hasSecCasaId = secTableInfo.some(col => col.name === 'casa_id');
+  if (!hasSecCasaId) {
+    db.exec("ALTER TABLE sections ADD COLUMN casa_id TEXT NOT NULL DEFAULT 'casa_floresta';");
+  }
 } catch (e) {
-  console.warn('Nota en migración de items:', e.message);
+  console.warn('Nota en migración de items/sections:', e.message);
 }
 
 // Crear índices si no existen
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_items_casa ON items(casa_id);
   CREATE INDEX IF NOT EXISTS idx_items_categoria ON items(categoria);
+  CREATE INDEX IF NOT EXISTS idx_sections_casa ON sections(casa_id);
 `);
 
 // Migración y siembra de datos iniciales
@@ -453,10 +461,11 @@ const SectionRepo = {
         SELECT s.*, COUNT(i.id) as item_count 
         FROM sections s
         LEFT JOIN items i ON s.nombre = i.seccion AND i.casa_id = ?
+        WHERE s.casa_id = ? OR s.casa_id IS NULL OR s.casa_id = ''
         GROUP BY s.id
         ORDER BY s.orden ASC, s.created_at ASC
       `);
-      return query.all(casaId);
+      return query.all(casaId, casaId);
     }
 
     const query = db.prepare(`
@@ -474,29 +483,34 @@ const SectionRepo = {
     return query.get(id);
   },
 
-  getByName(nombre) {
-    const query = db.prepare('SELECT * FROM sections WHERE nombre = ?');
-    return query.get(nombre);
+  getByName(nombre, casaId = null) {
+    if (casaId) {
+      const query = db.prepare('SELECT * FROM sections WHERE LOWER(nombre) = LOWER(?) AND (casa_id = ? OR casa_id IS NULL)');
+      return query.get(nombre.trim(), casaId);
+    }
+    const query = db.prepare('SELECT * FROM sections WHERE LOWER(nombre) = LOWER(?)');
+    return query.get(nombre.trim());
   },
 
-  create({ id, nombre, icono, descripcion, orden }) {
+  create({ id, casa_id, nombre, icono, descripcion, orden }) {
     const stmt = db.prepare(`
-      INSERT INTO sections (id, nombre, icono, descripcion, orden, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO sections (id, casa_id, nombre, icono, descripcion, orden, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     const now = new Date().toISOString();
-    stmt.run(id, nombre, icono || '📦', descripcion || '', orden || 99, now);
+    const targetCasaId = casa_id || 'casa_floresta';
+    stmt.run(id, targetCasaId, nombre.trim(), icono || '📦', descripcion ? descripcion.trim() : '', orden || 99, now);
     return this.getById(id);
   },
 
-  update(id, { nombre, icono, descripcion, orden }) {
+  update(id, { nombre, icono, descripcion, orden, casa_id }) {
     const existing = this.getById(id);
     if (!existing) return null;
 
-    // Si cambia el nombre, actualizar en cascada los items
-    if (nombre && nombre !== existing.nombre) {
-      const updateItems = db.prepare('UPDATE items SET seccion = ? WHERE seccion = ?');
-      updateItems.run(nombre, existing.nombre);
+    // Si cambia el nombre, actualizar en cascada los items de esta casa
+    if (nombre && nombre.trim() !== existing.nombre) {
+      const updateItems = db.prepare('UPDATE items SET seccion = ? WHERE seccion = ? AND casa_id = ?');
+      updateItems.run(nombre.trim(), existing.nombre, existing.casa_id || 'casa_floresta');
     }
 
     const stmt = db.prepare(`
@@ -504,10 +518,18 @@ const SectionRepo = {
       SET nombre = COALESCE(?, nombre),
           icono = COALESCE(?, icono),
           descripcion = COALESCE(?, descripcion),
-          orden = COALESCE(?, orden)
+          orden = COALESCE(?, orden),
+          casa_id = COALESCE(?, casa_id)
       WHERE id = ?
     `);
-    stmt.run(nombre, icono, descripcion, orden, id);
+    stmt.run(
+      nombre ? nombre.trim() : null, 
+      icono || null, 
+      descripcion !== undefined ? descripcion.trim() : null, 
+      orden || null, 
+      casa_id || null, 
+      id
+    );
     return this.getById(id);
   },
 
@@ -515,8 +537,11 @@ const SectionRepo = {
     const existing = this.getById(id);
     if (!existing) return { deleted: false, reason: 'not_found' };
 
-    // Verificar si existen ítems en esta sección
-    const countCheck = db.prepare('SELECT COUNT(*) as count FROM items WHERE seccion = ?').get(existing.nombre);
+    // Verificar si existen ítems en esta sección para esta casa
+    const countCheck = db.prepare('SELECT COUNT(*) as count FROM items WHERE seccion = ? AND casa_id = ?').get(
+      existing.nombre,
+      existing.casa_id || 'casa_floresta'
+    );
     if (countCheck.count > 0) {
       return { 
         deleted: false, 

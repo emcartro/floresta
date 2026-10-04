@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="styles.css?v=6">
+  <link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
   <!-- Offline status alert -->
@@ -70,21 +70,7 @@
             </div>
           </div>
 
-          <button id="btn-open-backup" class="btn btn-secondary btn-icon" title="Copia de Seguridad y Restauración (ZIP)" aria-label="Copia de Seguridad">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-              <line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>
-            <span class="btn-text-desktop">Respaldo ZIP</span>
-          </button>
 
-          <button id="btn-export-csv" class="btn btn-secondary btn-icon" title="Exportar a Excel / CSV" aria-label="Exportar CSV">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-            </svg>
-            <span class="btn-text-desktop">Exportar CSV</span>
-          </button>
           
           <button id="btn-install-pwa" class="btn btn-outline btn-icon hidden" title="Instalar App" aria-label="Instalar PWA">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
@@ -239,41 +225,43 @@
           <button id="search-clear" class="btn-clear hidden" aria-label="Limpiar búsqueda">✕</button>
         </div>
 
-        <div class="tag-filter-group" role="group" aria-label="Filtrar por etiqueta de destino">
-          <button class="tag-pill active" data-tag="ALL">
-            <span>Todas</span>
-            <span class="pill-count" id="pill-count-all">0</span>
-          </button>
-          <button class="tag-pill tag-guardar-pill" data-tag="Almacenar">
-            <span class="dot dot-guardar"></span>
-            <span>Almacenar</span>
-            <span class="pill-count" id="pill-count-guardar">0</span>
-          </button>
-          <button class="tag-pill tag-llevar-pill" data-tag="Llevar">
-            <span class="dot dot-llevar"></span>
-            <span>Llevar</span>
-            <span class="pill-count" id="pill-count-llevar">0</span>
-          </button>
-          <button class="tag-pill tag-donar-pill" data-tag="Donar">
-            <span class="dot dot-donar"></span>
-            <span>Donar</span>
-            <span class="pill-count" id="pill-count-donar">0</span>
-          </button>
-          <button class="tag-pill tag-vender-pill" data-tag="Vender">
-            <span class="dot dot-vender"></span>
-            <span>Vender</span>
-            <span class="pill-count" id="pill-count-vender">0</span>
-          </button>
-        </div>
+        <div class="filters-controls-row">
+          <div class="tag-filter-group" role="group" aria-label="Filtrar por etiqueta de destino">
+            <button class="tag-pill active" data-tag="ALL">
+              <span>Todas</span>
+              <span class="pill-count" id="pill-count-all">0</span>
+            </button>
+            <button class="tag-pill tag-guardar-pill" data-tag="Almacenar">
+              <span class="dot dot-guardar"></span>
+              <span>Almacenar</span>
+              <span class="pill-count" id="pill-count-guardar">0</span>
+            </button>
+            <button class="tag-pill tag-llevar-pill" data-tag="Llevar">
+              <span class="dot dot-llevar"></span>
+              <span>Llevar</span>
+              <span class="pill-count" id="pill-count-llevar">0</span>
+            </button>
+            <button class="tag-pill tag-donar-pill" data-tag="Donar">
+              <span class="dot dot-donar"></span>
+              <span>Donar</span>
+              <span class="pill-count" id="pill-count-donar">0</span>
+            </button>
+            <button class="tag-pill tag-vender-pill" data-tag="Vender">
+              <span class="dot dot-vender"></span>
+              <span>Vender</span>
+              <span class="pill-count" id="pill-count-vender">0</span>
+            </button>
+          </div>
 
-        <!-- Filtro por Categoría -->
-        <div class="category-filter-wrapper">
-          <label for="filter-categoria" class="sr-only">Filtrar por Categoría</label>
-          <div class="category-select-box">
-            <span class="category-select-icon">🏷️</span>
-            <select id="filter-categoria" class="category-filter-select" aria-label="Filtrar por categoría">
-              <option value="ALL">Todas las Categorías</option>
-            </select>
+          <!-- Filtro por Categoría -->
+          <div class="category-filter-wrapper">
+            <label for="filter-categoria" class="sr-only">Filtrar por Categoría</label>
+            <div class="category-select-box">
+              <span class="category-select-icon">🏷️</span>
+              <select id="filter-categoria" class="category-filter-select" aria-label="Filtrar por categoría">
+                <option value="ALL">Todas las Categorías</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -381,8 +369,11 @@
       <main class="main-content">
         <div class="sections-mgmt-header">
           <div>
-            <h2 class="view-heading">Secciones y Habitaciones del Hogar</h2>
-            <p class="view-subheading">Crea, edita y organiza las áreas de tu vivienda para clasificar tu inventario.</p>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <h2 class="view-heading">Secciones y Habitaciones</h2>
+              <span id="sec-active-casa-pill" class="sections-counter-pill" style="font-size:0.75rem;">🏡 Casa Floresta</span>
+            </div>
+            <p class="view-subheading">Crea, edita y organiza las áreas de esta propiedad para clasificar tu inventario.</p>
           </div>
         </div>
 
@@ -495,10 +486,28 @@
             <h2 class="title-bold">Administración de Casas</h2>
             <p class="subtitle-text">Gestiona tus diferentes propiedades, casas o apartamentos independientes.</p>
           </div>
-          <button type="button" id="btn-casas-panel-add" class="btn btn-primary">
-            <span>➕</span>
-            <span>Nueva Propiedad</span>
-          </button>
+          <div class="header-action-group">
+            <button type="button" id="btn-open-backup" class="btn btn-secondary btn-icon" title="Copia de Seguridad y Restauración (ZIP)" aria-label="Copia de Seguridad">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+              </svg>
+              <span>Respaldo ZIP</span>
+            </button>
+
+            <button type="button" id="btn-export-csv" class="btn btn-secondary btn-icon" title="Exportar a Excel / CSV" aria-label="Exportar CSV">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+              </svg>
+              <span>Exportar CSV</span>
+            </button>
+
+            <button type="button" id="btn-casas-panel-add" class="btn btn-primary">
+              <span>➕</span>
+              <span>Nueva Propiedad</span>
+            </button>
+          </div>
         </div>
 
         <!-- Banner Informativo -->
@@ -1134,6 +1143,6 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>

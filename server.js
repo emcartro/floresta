@@ -375,20 +375,22 @@ app.get('/api/sections', requireAuth, (req, res) => {
 // Crear nueva sección
 app.post('/api/sections', requireAuth, (req, res) => {
   try {
-    const { nombre, icono, descripcion } = req.body;
+    const { nombre, icono, descripcion, casa_id } = req.body;
     if (!nombre || !nombre.trim()) {
       return res.status(400).json({ error: 'El nombre de la sección es obligatorio' });
     }
 
     const trimmedNombre = nombre.trim();
-    const existing = SectionRepo.getByName(trimmedNombre);
+    const targetCasaId = casa_id || 'casa_floresta';
+    const existing = SectionRepo.getByName(trimmedNombre, targetCasaId);
     if (existing) {
-      return res.status(409).json({ error: 'Ya existe una sección con este nombre' });
+      return res.status(409).json({ error: 'Ya existe una sección con este nombre en esta casa' });
     }
 
     const id = 'sec_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
     const newSection = SectionRepo.create({
       id,
+      casa_id: targetCasaId,
       nombre: trimmedNombre,
       icono: icono || '📦',
       descripcion: descripcion ? descripcion.trim() : '',
@@ -406,17 +408,19 @@ app.post('/api/sections', requireAuth, (req, res) => {
 app.put('/api/sections/:id', requireAuth, (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, icono, descripcion } = req.body;
+    const { nombre, icono, descripcion, casa_id } = req.body;
 
     const existing = SectionRepo.getById(id);
     if (!existing) {
       return res.status(404).json({ error: 'Sección no encontrada' });
     }
 
+    const targetCasaId = casa_id || existing.casa_id || 'casa_floresta';
+
     if (nombre && nombre.trim() !== existing.nombre) {
-      const nameConflict = SectionRepo.getByName(nombre.trim());
+      const nameConflict = SectionRepo.getByName(nombre.trim(), targetCasaId);
       if (nameConflict && nameConflict.id !== id) {
-        return res.status(409).json({ error: 'Ya existe otra sección con ese nombre' });
+        return res.status(409).json({ error: 'Ya existe otra sección con ese nombre en esta casa' });
       }
     }
 
@@ -424,7 +428,8 @@ app.put('/api/sections/:id', requireAuth, (req, res) => {
       nombre: nombre ? nombre.trim() : existing.nombre,
       icono: icono || existing.icono,
       descripcion: descripcion !== undefined ? descripcion.trim() : existing.descripcion,
-      orden: existing.orden
+      orden: existing.orden,
+      casa_id: targetCasaId
     });
 
     res.json(updated);
