@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Inventario para el Hogar</title>
+  
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Inventario">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Offline status alert -->
+  <div id="offline-badge" class="offline-indicator hidden" role="status">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>
+    </svg>
+    <span>Modo sin conexión (datos guardados localmente)</span>
+  </div>
+
+  <div class="app-layout">
+    <!-- Top App Bar -->
+    <header class="app-header">
+      <div class="header-main">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="brand-title">Inventario Hogar</h1>
+            <p class="brand-subtitle">Gestión inteligente con SQL y Fotos</p>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button id="btn-export-csv" class="btn btn-secondary btn-icon" title="Exportar a Excel / CSV" aria-label="Exportar CSV">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            <span class="btn-text-desktop">Exportar CSV</span>
+          </button>
+          
+          <button id="btn-install-pwa" class="btn btn-outline btn-icon hidden" title="Instalar App" aria-label="Instalar PWA">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 16v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4M12 4v12M8 12l4 4 4-4"/>
+            </svg>
+            <span class="btn-text-desktop">Instalar</span>
+          </button>
+          
+          <button id="btn-open-add" class="btn btn-primary btn-add-header" aria-label="Agregar nuevo ítem">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Nuevo Ítem</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de Navegación Principal entre Vistas (Pestañas Globales) -->
+      <nav class="main-view-nav" role="tablist" aria-label="Vistas principales">
+        <button id="nav-tab-inventory" class="view-nav-tab active" role="tab" aria-selected="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+          <span>Inventario</span>
+        </button>
+
+        <button id="nav-tab-sections" class="view-nav-tab" role="tab" aria-selected="false">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span>Secciones del Hogar</span>
+          <span class="tab-pill-badge" id="nav-sections-count">8</span>
+        </button>
+      </nav>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- VISTA 1: INVENTARIO PRINCIPAL                                         -->
+    <!-- ===================================================================== -->
+    <div id="view-inventory" class="view-container">
+      <!-- Resumen / Métricas Principales -->
+      <section class="metrics-container" aria-label="Resumen de Inventario">
+        <div class="metric-card metric-total">
+          <div class="metric-icon total-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+            </svg>
+          </div>
+          <div class="metric-data">
+            <span class="metric-value" id="metric-total-items">0</span>
+            <span class="metric-label">Total Ítems</span>
+          </div>
+        </div>
+
+        <div class="metric-card metric-guardar">
+          <div class="metric-icon guardar-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
+            </svg>
+          </div>
+          <div class="metric-data">
+            <span class="metric-value" id="metric-guardar-items">0</span>
+            <span class="metric-label">A Guardar</span>
+          </div>
+        </div>
+
+        <div class="metric-card metric-donar">
+          <div class="metric-icon donar-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </div>
+          <div class="metric-data">
+            <span class="metric-value" id="metric-donar-items">0</span>
+            <span class="metric-label">A Donar</span>
+          </div>
+        </div>
+
+        <div class="metric-card metric-vender">
+          <div class="metric-icon vender-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+          </div>
+          <div class="metric-data">
+            <div class="vender-values">
+              <span class="metric-value" id="metric-vender-items">0</span>
+              <span class="vender-divider">•</span>
+              <span class="metric-value-cash" id="metric-vender-total">$0</span>
+            </div>
+            <span class="metric-label">A Vender (Estimado)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel de Filtros y Búsqueda -->
+      <div class="filters-panel">
+        <div class="search-input-wrapper">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="search" id="search-input" placeholder="Buscar por nombre, fotos o nota..." autocomplete="off">
+          <button id="search-clear" class="btn-clear hidden" aria-label="Limpiar búsqueda">✕</button>
+        </div>
+
+        <div class="tag-filter-group" role="group" aria-label="Filtrar por etiqueta de destino">
+          <button class="tag-pill active" data-tag="ALL">
+            <span>Todas</span>
+            <span class="pill-count" id="pill-count-all">0</span>
+          </button>
+          <button class="tag-pill tag-guardar-pill" data-tag="Guardar">
+            <span class="dot dot-guardar"></span>
+            <span>Guardar</span>
+            <span class="pill-count" id="pill-count-guardar">0</span>
+          </button>
+          <button class="tag-pill tag-donar-pill" data-tag="Donar">
+            <span class="dot dot-donar"></span>
+            <span>Donar</span>
+            <span class="pill-count" id="pill-count-donar">0</span>
+          </button>
+          <button class="tag-pill tag-vender-pill" data-tag="Vender">
+            <span class="dot dot-vender"></span>
+            <span>Vender</span>
+            <span class="pill-count" id="pill-count-vender">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Secciones Tabs (Horizontal Scroller) -->
+      <nav class="sections-nav" aria-label="Navegación por secciones">
+        <div class="sections-scroller" id="sections-tabs" role="tablist">
+          <!-- Dynamic section tabs injected by JS -->
+        </div>
+      </nav>
+
+      <!-- Main Content Area -->
+      <main class="main-content">
+        <!-- Section summary headline -->
+        <div class="section-headline">
+          <div class="headline-left">
+            <h2 class="section-title" id="current-section-title">Sala</h2>
+            <span class="section-badge-counter" id="current-section-counter">0 ítems</span>
+          </div>
+          <div class="headline-actions">
+            <label for="sort-select" class="sr-only">Ordenar por</label>
+            <select id="sort-select" class="sort-dropdown">
+              <option value="recent">Más recientes</option>
+              <option value="name-asc">Nombre (A-Z)</option>
+              <option value="name-desc">Nombre (Z-A)</option>
+              <option value="price-desc">Mayor precio venta</option>
+              <option value="status">Estado</option>
+              <option value="has-photos">Con fotos primero</option>
+            </select>
+            <button id="btn-toggle-stats" class="btn-mini-toggle" title="Ver desglose de habitaciones" aria-label="Ver estadísticas">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 20V10M12 20V4M6 20v-6"/>
+              </svg>
+              <span>Desglose</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible room breakdown breakdown card -->
+        <div id="room-breakdown-card" class="room-breakdown-card hidden">
+          <div class="breakdown-header">
+            <h3>Distribución por Habitación</h3>
+            <button id="btn-close-breakdown" class="btn-icon-subtle">✕</button>
+          </div>
+          <div class="breakdown-grid" id="breakdown-grid">
+            <!-- Injected dynamically -->
+          </div>
+        </div>
+
+        <!-- Items List Container -->
+        <div id="items-container" class="items-grid" role="region" aria-live="polite">
+          <!-- Rendered items cards -->
+        </div>
+
+        <!-- Empty state container -->
+        <div id="empty-state" class="empty-state hidden">
+          <div class="empty-illustration">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+          </div>
+          <h3 class="empty-title">No hay ítems aquí</h3>
+          <p class="empty-desc" id="empty-state-message">No se encontraron artículos con los filtros seleccionados en esta sección.</p>
+          <button id="btn-empty-add" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Registrar nuevo ítem
+          </button>
+        </div>
+      </main>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VISTA 2: GESTIÓN Y CREACIÓN DE SECCIONES DEL HOGAR                    -->
+    <!-- ===================================================================== -->
+    <div id="view-sections" class="view-container hidden">
+      <main class="main-content">
+        <div class="sections-mgmt-header">
+          <div>
+            <h2 class="view-heading">Secciones y Habitaciones del Hogar</h2>
+            <p class="view-subheading">Crea, edita y organiza las áreas de tu vivienda para clasificar tu inventario.</p>
+          </div>
+        </div>
+
+        <!-- Formulario para Crear / Editar Sección -->
+        <section class="section-form-card">
+          <div class="section-form-card-header">
+            <h3 id="sec-card-title">➕ Nueva Sección</h3>
+            <span class="card-hint">Personaliza el nombre y emoji para identificar la habitación</span>
+          </div>
+
+          <form id="section-form" class="section-form-inner">
+            <input type="hidden" id="sec-form-id">
+            
+            <div class="form-row">
+              <div class="form-group flex-2">
+                <label for="sec-form-nombre" class="form-label">
+                  Nombre de la Sección / Habitación <span class="required-indicator">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  id="sec-form-nombre" 
+                  class="form-input" 
+                  placeholder="Ej. Terraza, Garaje, Lavandería, Sótano..." 
+                  required 
+                  maxlength="50"
+                >
+                <span class="form-error" id="sec-error-nombre"></span>
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="sec-form-icono" class="form-label">Icono / Emoji</label>
+                <input 
+                  type="text" 
+                  id="sec-form-icono" 
+                  class="form-input text-center text-emoji" 
+                  value="📦" 
+                  maxlength="4"
+                >
+              </div>
+            </div>
+
+            <!-- Selector rápido de emojis -->
+            <div class="form-group">
+              <label class="form-label">Emojis rápidos populares:</label>
+              <div class="emoji-picker-row" id="emoji-quick-picker">
+                <button type="button" class="btn-emoji" data-emoji="🛋️">🛋️ Sala</button>
+                <button type="button" class="btn-emoji" data-emoji="🛏️">🛏️ Principal</button>
+                <button type="button" class="btn-emoji" data-emoji="🛌">🛌 Secundario</button>
+                <button type="button" class="btn-emoji" data-emoji="🍳">🍳 Cocina</button>
+                <button type="button" class="btn-emoji" data-emoji="🍽️">🍽️ Comedor</button>
+                <button type="button" class="btn-emoji" data-emoji="🚿">🚿 Baño</button>
+                <button type="button" class="btn-emoji" data-emoji="💻">💻 Estudio</button>
+                <button type="button" class="btn-emoji" data-emoji="🪴">🪴 Balcón</button>
+                <button type="button" class="btn-emoji" data-emoji="🚗">🚗 Garaje</button>
+                <button type="button" class="btn-emoji" data-emoji="🧺">🧺 Lavandería</button>
+                <button type="button" class="btn-emoji" data-emoji="📦">📦 Bodega</button>
+                <button type="button" class="btn-emoji" data-emoji="🌿">🌿 Jardín</button>
+                <button type="button" class="btn-emoji" data-emoji="🍷">🍷 Bar</button>
+                <button type="button" class="btn-emoji" data-emoji="🎮">🎮 Juegos</button>
+                <button type="button" class="btn-emoji" data-emoji="🛠️">🛠️ Taller</button>
+                <button type="button" class="btn-emoji" data-emoji="🏊">🏊 Piscina</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="sec-form-desc" class="form-label">Descripción o notas (opcional)</label>
+              <input 
+                type="text" 
+                id="sec-form-desc" 
+                class="form-input" 
+                placeholder="Ej. Espacio exterior, muebles de jardín y herramientas..."
+                maxlength="120"
+              >
+            </div>
+
+            <div class="section-form-actions">
+              <button type="button" id="btn-cancel-sec-edit" class="btn btn-secondary hidden">Cancelar Edición</button>
+              <button type="submit" id="btn-submit-sec" class="btn btn-primary">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                  <polyline points="17 21 17 13 7 13 7 21"/>
+                  <polyline points="7 3 7 8 15 8"/>
+                </svg>
+                <span id="btn-submit-sec-text">Guardar Sección</span>
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Cuadrícula de Secciones Existentes -->
+        <div class="sections-list-header">
+          <h3 class="subtitle-bold">Secciones Registradas</h3>
+          <span class="sections-counter-pill" id="sections-total-pill">8 habitaciones</span>
+        </div>
+
+        <div class="sections-manage-grid" id="sections-manage-grid">
+          <!-- Renderizado dinámicamente con JS -->
+        </div>
+      </main>
+    </div>
+
+    <!-- Floating Action Button (Mobile FAB) -->
+    <button id="fab-add" class="fab-button" title="Agregar ítem" aria-label="Agregar nuevo ítem">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL / DRAWER: FORMULARIO DE REGISTRO / EDICIÓN DE ÍTEM CON FOTOS    -->
+  <!-- ===================================================================== -->
+  <div id="item-modal-overlay" class="modal-overlay hidden" aria-hidden="true">
+    <div class="modal-drawer" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="drawer-handle" aria-hidden="true"></div>
+      
+      <header class="modal-header">
+        <div>
+          <h2 id="modal-title" class="modal-title">Registrar Ítem</h2>
+          <p class="modal-subtitle">Organiza tus pertenencias y define su destino</p>
+        </div>
+        <button id="btn-close-modal" class="btn-icon-subtle" aria-label="Cerrar formulario">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </header>
+
+      <form id="item-form" class="modal-form" novalidate>
+        <input type="hidden" id="item-id">
+
+        <!-- Campo Nombre -->
+        <div class="form-group">
+          <label for="form-nombre" class="form-label">
+            Nombre del Ítem <span class="required-indicator">*</span>
+          </label>
+          <input 
+            type="text" 
+            id="form-nombre" 
+            name="nombre" 
+            class="form-input" 
+            placeholder="Ej. Sofá de 3 puestos, Cafetera Oster..." 
+            required 
+            maxlength="100"
+          >
+          <span class="form-error" id="error-nombre"></span>
+        </div>
+
+        <!-- Fotos del Ítem (Upload & Preview) -->
+        <div class="form-group">
+          <div class="photo-field-header">
+            <label class="form-label">
+              📸 Fotos del Artículo <span class="optional-badge">(opcional, hasta 10)</span>
+            </label>
+            <span class="photo-counter-text" id="photo-counter-badge">0 fotos</span>
+          </div>
+
+          <div class="photo-uploader-box" id="photo-dropzone">
+            <input 
+              type="file" 
+              id="form-photos-input" 
+              multiple 
+              accept="image/*" 
+              class="hidden-file-input"
+            >
+            <div class="photo-uploader-content" id="btn-trigger-file">
+              <div class="uploader-icon">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+              </div>
+              <p class="uploader-title">Tomar foto o subir imágenes</p>
+              <p class="uploader-subtitle">Haz clic o arrastra fotos aquí (JPG, PNG, WebP)</p>
+            </div>
+          </div>
+
+          <!-- Galería de vistas previas de fotos cargadas -->
+          <div class="photo-preview-grid hidden" id="photo-preview-grid">
+            <!-- Miniaturas inyectadas con botón de eliminar -->
+          </div>
+        </div>
+
+        <!-- Fila Sección & Estado -->
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="form-seccion" class="form-label">
+              Sección / Habitación <span class="required-indicator">*</span>
+            </label>
+            <select id="form-seccion" name="seccion" class="form-select" required>
+              <!-- Llenado dinámicamente con las secciones de la BD -->
+            </select>
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="form-estado" class="form-label">
+              Estado <span class="required-indicator">*</span>
+            </label>
+            <select id="form-estado" name="estado" class="form-select" required>
+              <option value="Excelente">Excelente</option>
+              <option value="Buen estado">Buen estado</option>
+              <option value="Regular">Regular</option>
+              <option value="Para reparar">Para reparar</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Etiqueta de Destino (Radio Cards interactivos) -->
+        <div class="form-group">
+          <label class="form-label">
+            Etiqueta de Destino <span class="required-indicator">*</span>
+          </label>
+          <div class="destination-selector" role="radiogroup" aria-label="Destino del ítem">
+            <label class="dest-option dest-guardar">
+              <input type="radio" name="etiqueta_destino" value="Guardar" checked>
+              <div class="dest-content">
+                <div class="dest-indicator">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
+                  </svg>
+                </div>
+                <div class="dest-texts">
+                  <span class="dest-title">Guardar</span>
+                  <span class="dest-desc">Conservar en el hogar</span>
+                </div>
+              </div>
+            </label>
+
+            <label class="dest-option dest-donar">
+              <input type="radio" name="etiqueta_destino" value="Donar">
+              <div class="dest-content">
+                <div class="dest-indicator">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                  </svg>
+                </div>
+                <div class="dest-texts">
+                  <span class="dest-title">Donar</span>
+                  <span class="dest-desc">Regalar o apoyar</span>
+                </div>
+              </div>
+            </label>
+
+            <label class="dest-option dest-vender">
+              <input type="radio" name="etiqueta_destino" value="Vender">
+              <div class="dest-content">
+                <div class="dest-indicator">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="1" x2="12" y2="23"/>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                  </svg>
+                </div>
+                <div class="dest-texts">
+                  <span class="dest-title">Vender</span>
+                  <span class="dest-desc">Publicar y monetizar</span>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Campo Dinámico: Precio de Venta (Solo visible/obligatorio si Vender) -->
+        <div id="group-precio-venta" class="form-group dynamic-field hidden">
+          <label for="form-precio" class="form-label">
+            Precio Estimado de Venta <span class="required-indicator">*</span>
+          </label>
+          <div class="input-money-wrapper">
+            <span class="currency-symbol">$</span>
+            <input 
+              type="number" 
+              id="form-precio" 
+              name="precio_venta" 
+              class="form-input form-input-money" 
+              placeholder="0" 
+              min="0" 
+              step="1"
+            >
+          </div>
+          <span class="form-hint">Ingresa el valor monetario esperado para este artículo.</span>
+          <span class="form-error" id="error-precio"></span>
+        </div>
+
+        <!-- Campo Notas -->
+        <div class="form-group">
+          <label for="form-notas" class="form-label">
+            Notas Adicionales <span class="optional-badge">(opcional)</span>
+          </label>
+          <textarea 
+            id="form-notas" 
+            name="notas" 
+            class="form-textarea" 
+            rows="3" 
+            placeholder="Dimensiones, color, marca, detalles de desgaste o ubicación exacta..."
+          ></textarea>
+        </div>
+
+        <!-- Footer / Botones del formulario -->
+        <div class="modal-actions">
+          <button type="button" id="btn-cancel-modal" class="btn btn-secondary">Cancelar</button>
+          <button type="submit" id="btn-save-item" class="btn btn-primary btn-save">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            <span id="btn-save-text">Guardar Ítem</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmación para Eliminar (Ítem o Sección) -->
+  <div id="delete-modal-overlay" class="modal-overlay hidden" aria-hidden="true">
+    <div class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-title">
+      <div class="delete-icon-wrapper">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#ef4444" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>
+      </div>
+      <h3 id="delete-title" class="confirm-title">¿Eliminar este registro?</h3>
+      <p class="confirm-desc" id="delete-desc">
+        Estás a punto de eliminar <strong id="delete-item-name">"Sofá"</strong>. Esta acción se guardará de inmediato y no se puede deshacer.
+      </p>
+      <div class="confirm-actions">
+        <button id="btn-cancel-delete" class="btn btn-secondary flex-1">Cancelar</button>
+        <button id="btn-confirm-delete" class="btn btn-danger flex-1">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Lightbox para Ver Fotos a Pantalla Completa -->
+  <div id="photo-lightbox-modal" class="modal-overlay hidden" aria-hidden="true">
+    <div class="lightbox-container" role="dialog" aria-modal="true">
+      <button id="btn-close-lightbox" class="lightbox-close-btn" aria-label="Cerrar visor">✕</button>
+      <div class="lightbox-media-wrapper">
+        <img id="lightbox-img" src="" alt="Foto en alta resolución" class="lightbox-img">
+      </div>
+      <div class="lightbox-footer">
+        <span id="lightbox-caption" class="lightbox-caption">Foto del artículo</span>
+        <div class="lightbox-nav-controls" id="lightbox-controls">
+          <button id="btn-lightbox-prev" class="btn-icon-lightbox">‹</button>
+          <span id="lightbox-index-badge">1 / 1</span>
+          <button id="btn-lightbox-next" class="btn-icon-lightbox">›</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

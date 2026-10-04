@@ -1,0 +1,25 @@
+{
+  "name": "inventario-hogar-pwa",
+  "version": "1.0.0",
+  "description": "Progressive Web App (PWA) de Inventario para el Hogar con persistencia SQL, gestión de fotos y soporte para Docker/Coolify",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "generate-icons": "node generate-icons.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "keywords": [
+    "pwa",
+    "inventario",
+    "hogar",
+    "sqlite",
+    "sql",
+    "coolify",
+    "docker"
+  ],
+  "author": "",
+  "license": "MIT"
+}

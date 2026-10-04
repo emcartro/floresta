@@ -1,0 +1,9 @@
+node_modules
+npm-debug.log
+data
+data/inventario.sqlite*
+data/uploads/*
+.git
+.gitignore
+.DS_Store
+Thumbs.db

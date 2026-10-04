@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e40af" />
+      <stop offset="50%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+    <linearGradient id="roofGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" />
+
+  <!-- Inner ambient glow -->
+  <circle cx="256" cy="180" r="140" fill="#ffffff" opacity="0.08" />
+
+  <!-- House Silhouette with Checklist / Box inside -->
+  <g filter="url(#shadow)">
+    <!-- Roof -->
+    <path d="M 256 100 L 110 220 C 104 225 102 233 106 240 C 110 247 118 250 126 244 L 256 138 L 386 244 C 394 250 402 247 406 240 C 410 233 408 225 402 220 Z" fill="#ffffff" opacity="0.95"/>
+    
+    <!-- Chimney -->
+    <path d="M 340 140 L 375 140 L 375 200 L 340 172 Z" fill="#e0e7ff" opacity="0.9"/>
+
+    <!-- Main House Body -->
+    <path d="M 140 230 L 372 230 C 378 230 384 235 384 242 L 384 380 C 384 394 372 406 358 406 L 154 406 C 140 406 128 394 128 380 L 128 242 C 128 235 134 230 140 230 Z" fill="#ffffff"/>
+
+    <!-- Inventory Box / Tag Graphic inside House -->
+    <!-- Clipboard / Tag -->
+    <rect x="176" y="260" width="160" height="110" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="4"/>
+    
+    <!-- Tag Pill Header -->
+    <rect x="200" y="278" width="60" height="12" rx="6" fill="#3b82f6"/>
+    <rect x="200" y="302" width="112" height="10" rx="5" fill="#cbd5e1"/>
+    <rect x="200" y="322" width="85" height="10" rx="5" fill="#cbd5e1"/>
+
+    <!-- Checkmark Badge -->
+    <circle cx="310" cy="336" r="22" fill="#10b981"/>
+    <path d="M 301 336 L 307 342 L 320 329" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

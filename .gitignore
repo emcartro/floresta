@@ -1,0 +1,19 @@
+# Dependencias
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Datos persistentes locales y base de datos SQL
+data/
+data/inventario.sqlite*
+data/uploads/*
+
+# Entornos y logs
+.env
+.env.local
+*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
