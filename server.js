@@ -807,6 +807,21 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Manejo de apagado seguro (Graceful Shutdown) para Coolify y Docker
+function handleShutdown(signal) {
+  console.log(`\n🛑 Recibida señal ${signal}. Vaciando WAL y cerrando base de datos SQLite de forma segura...`);
+  try {
+    closeDatabase();
+    console.log('✅ Base de datos SQLite guardada y cerrada limpiamente.');
+  } catch (err) {
+    console.error('Error cerrando SQLite en apagado:', err);
+  }
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+
 // Iniciar servidor
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
