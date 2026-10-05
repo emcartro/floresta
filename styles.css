@@ -3321,3 +3321,272 @@ body {
   border: 1px solid var(--border);
   cursor: default;
 }
+
+/* ==========================================================================
+   OPTIMIZACIONES Y RESPONSIVIDAD MÓVIL INTEGRAL (< 640px)
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* 1. Header más compacto y limpio */
+  .header-main {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .brand-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+  }
+
+  .brand-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .brand-title {
+    font-size: 1rem;
+    line-height: 1.1;
+  }
+
+  /* Ocultar subtítulo largo en móviles para ganar espacio */
+  .brand-subtitle {
+    display: none;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  /* Selector de Casa más compacto */
+  .btn-property-switch {
+    padding: 6px 9px;
+    font-size: 0.8rem;
+    gap: 5px;
+  }
+
+  .property-icon {
+    font-size: 1rem;
+  }
+
+  .property-name {
+    max-width: 85px;
+  }
+
+  /* Botón 'Nuevo Ítem' en el header para móviles: solo ícono '+' */
+  .btn-add-header {
+    padding: 7px 10px;
+    font-size: 0.82rem;
+  }
+
+  .btn-add-header span {
+    display: none;
+  }
+
+  .btn-user-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.75rem;
+  }
+
+  /* 2. Barra de Navegación de Vistas Principal */
+  .main-view-nav {
+    padding: 2px 8px;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .main-view-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .view-nav-tab {
+    padding: 7px 10px;
+    font-size: 0.8rem;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .view-nav-tab svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* 3. Cuadrícula de Métricas en Móvil */
+  .metrics-container {
+    padding: 10px 12px;
+    gap: 8px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* La 5ta tarjeta (Venta Estimada) ocupa las 2 columnas completas */
+  .metric-vender {
+    grid-column: span 2;
+  }
+
+  .metric-card {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .metric-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .metric-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .metric-value {
+    font-size: 1rem;
+  }
+
+  .metric-label {
+    font-size: 0.65rem;
+  }
+
+  .metric-value-cash {
+    font-size: 0.88rem;
+  }
+
+  /* 4. Barra de Búsqueda y Filtros */
+  .filters-panel {
+    padding: 10px 12px 6px;
+  }
+
+  #search-input {
+    padding: 8px 34px 8px 34px;
+    font-size: 0.84rem;
+  }
+
+  .main-content {
+    padding: 12px;
+  }
+
+  /* 5. Cabecera de Sección y Controles (Detalle/Lista, Orden, Filtros) */
+  .section-headline {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .headline-left {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+  }
+
+  .headline-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    flex-wrap: nowrap;
+  }
+
+  .view-mode-toggle {
+    flex-shrink: 0;
+  }
+
+  .btn-view-mode {
+    padding: 5px 8px;
+    font-size: 0.74rem;
+  }
+
+  .sort-dropdown {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 150px;
+    padding: 6px 8px;
+    font-size: 0.74rem;
+  }
+
+  .btn-mini-toggle {
+    padding: 6px 9px;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  /* 6. Panel de Filtros Desplegable en Móvil */
+  .room-breakdown-card {
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  .filters-two-columns-layout {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .filters-col-attributes {
+    border-right: none;
+    padding-right: 0;
+    gap: 12px;
+  }
+
+  .breakdown-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .breakdown-item {
+    padding: 8px 10px;
+  }
+
+  .breakdown-name {
+    font-size: 0.78rem;
+  }
+
+  /* 7. Cuadrícula de Tarjetas de Ítems */
+  .items-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .item-card {
+    border-radius: var(--radius-md);
+  }
+
+  /* 8. Formularios en Móvil (Evitar overflow en filas) */
+  .form-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .form-input, .form-select, .form-textarea {
+    font-size: 16px; /* Evita que Safari/Chrome en iOS haga zoom automático molesto */
+  }
+
+  /* 9. Casas Gestión Grid en Móvil */
+  .casas-manage-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .casa-card {
+    padding: 16px;
+  }
+
+  .casa-card-avatar {
+    width: 44px;
+    height: 44px;
+    font-size: 1.5rem;
+  }
+
+  .casa-card-metrics-grid {
+    padding: 8px;
+    margin: 10px 0 14px;
+  }
+
+  .casa-stat-value {
+    font-size: 0.92rem;
+  }
+}
