@@ -1354,14 +1354,33 @@ destRadioInputs.forEach((radio) => {
   radio.addEventListener('change', handleDestinationChange);
 });
 
-// Selector de archivos de fotos
-document.getElementById('btn-trigger-file').addEventListener('click', () => {
-  photoInput.click();
-});
+// Selector de fotos: Cámara directa vs Galería
+const cameraInput = document.getElementById('form-camera-input');
+const btnTriggerCamera = document.getElementById('btn-trigger-camera');
+const btnTriggerFile = document.getElementById('btn-trigger-file');
 
-photoInput.addEventListener('change', (e) => {
-  handleSelectedFiles(Array.from(e.target.files));
-});
+if (btnTriggerCamera && cameraInput) {
+  btnTriggerCamera.addEventListener('click', () => {
+    cameraInput.click();
+  });
+
+  cameraInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleSelectedFiles(Array.from(e.target.files));
+      cameraInput.value = ''; // Limpiar para permitir tomar otra foto de inmediato
+    }
+  });
+}
+
+if (btnTriggerFile && photoInput) {
+  btnTriggerFile.addEventListener('click', () => {
+    photoInput.click();
+  });
+
+  photoInput.addEventListener('change', (e) => {
+    handleSelectedFiles(Array.from(e.target.files));
+  });
+}
 
 // Drag & drop de fotos
 photoDropzone.addEventListener('dragover', (e) => {

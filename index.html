@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
   <!-- Offline status alert -->
@@ -614,6 +614,7 @@
           </div>
 
           <div class="photo-uploader-box" id="photo-dropzone">
+            <!-- Input para la Galería (múltiples fotos) -->
             <input 
               type="file" 
               id="form-photos-input" 
@@ -621,16 +622,34 @@
               accept="image/*" 
               class="hidden-file-input"
             >
-            <div class="photo-uploader-content" id="btn-trigger-file">
-              <div class="uploader-icon">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8">
+            <!-- Input exclusivo para la Cámara en celulares (capture environment) -->
+            <input 
+              type="file" 
+              id="form-camera-input" 
+              accept="image/*" 
+              capture="environment" 
+              class="hidden-file-input"
+            >
+
+            <div class="photo-uploader-actions-row">
+              <button type="button" class="btn-photo-action btn-photo-camera" id="btn-trigger-camera">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                   <circle cx="12" cy="13" r="4"/>
                 </svg>
-              </div>
-              <p class="uploader-title">Tomar foto o subir imágenes</p>
-              <p class="uploader-subtitle">Haz clic o arrastra fotos aquí (JPG, PNG, WebP)</p>
+                <span>Tomar Foto (Cámara)</span>
+              </button>
+
+              <button type="button" class="btn-photo-action btn-photo-gallery" id="btn-trigger-file">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <span>Elegir de Galería</span>
+              </button>
             </div>
+            <p class="uploader-subtitle">Sube hasta 10 fotos (JPG, PNG, WebP) o arrástralas aquí</p>
           </div>
 
           <!-- Galería de vistas previas de fotos cargadas -->
@@ -1167,6 +1186,6 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
